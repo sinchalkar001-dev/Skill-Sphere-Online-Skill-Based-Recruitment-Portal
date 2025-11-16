@@ -1,0 +1,25 @@
+# Node modules
+node_modules/
+
+# Local SQLite DB
+server/skill_sphere.db
+
+# Environment files
+.env
+.env.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDEs and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Misc
+coverage/
+.cache/
+*.log
