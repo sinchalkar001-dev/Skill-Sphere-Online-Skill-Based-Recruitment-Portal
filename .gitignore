@@ -1,25 +1,29 @@
-# Node modules
+# Dependencies
 node_modules/
+package-lock.json
 
-# Local SQLite DB
-server/skill_sphere.db
-
-# Environment files
+# Environment
 .env
 .env.local
+.env.*.local
 
-# Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# Build output
+dist/
+build/
 
-# IDEs and OS files
+# IDE
 .vscode/
 .idea/
+*.swp
+*.swo
+
+# OS
 .DS_Store
 Thumbs.db
 
-# Misc
-coverage/
-.cache/
+# Logs
 *.log
+npm-debug.log*
+
+# Coverage
+coverage/

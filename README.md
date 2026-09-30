@@ -1,166 +1,113 @@
-# Skill Sphere — Online Skill-Based Recruitment Portal
+# 🚀 Skill Sphere — Online Skill-Based Recruitment Portal
 
-A modern, interactive web platform for project-based, assessment-driven job recruitment featuring secure JWT authentication, real-time job listings, and application management with email notifications.
+A full-stack, project-based, assessment-driven recruitment platform connecting skilled candidates with top employers.
 
-## 🎯 Features
+## ✨ Features
 
-### For Recruiters
-- ✅ Post custom job listings with tech tags
-- ✅ View all applications in a dashboard
-- ✅ Score and shortlist/reject candidates
-- ✅ Receive email notifications for new applications
-- ✅ Track candidate performance metrics
+- **Project-Based Hiring** — Candidates showcase real projects, not just resumes
+- **Assessment Scoring** — Structured rubrics for consistent evaluation
+- **Real-Time Notifications** — Socket.IO-powered instant updates
+- **Role-Based Dashboards** — Separate experiences for candidates and recruiters
+- **Skill Matching** — Tech stack tags for precise job matching
+- **Dark Mode** — Premium dark-themed UI with glassmorphism
 
-### For Candidates
-- ✅ Browse available job opportunities
-- ✅ Submit applications with cover letters and project links
-- ✅ Showcase tech skills and portfolio
-- ✅ Track application status
-- ✅ Real-time notifications
+## 🛠 Tech Stack
 
-### General
-- ✅ Secure JWT-based authentication
-- ✅ Bcrypt password encryption
-- ✅ Responsive, modern UI with animations
-- ✅ Dynamic form validation
-- ✅ Real-time alerts and feedback
+| Layer | Technology |
+|---|---|
+| Frontend | React 18 + Vite + React Router v6 |
+| Styling | TailwindCSS v3 + Headless UI + Heroicons |
+| State | React Context + useReducer |
+| Backend | Node.js + Express 4 |
+| Database | MongoDB + Mongoose 8 |
+| Auth | JWT (access + refresh tokens) |
+| Real-time | Socket.IO v4 |
+| Email | Nodemailer (console fallback) |
 
-## 🏗️ Tech Stack
+## 📦 Quick Start
 
-**Backend:**
-- Express.js
-- SQLite3
-- JWT (jsonwebtoken)
-- Bcryptjs
-- Nodemailer
+### Prerequisites
+- Node.js 18+
+- MongoDB running locally on `mongodb://localhost:27017`
 
-**Frontend:**
-- Vanilla HTML5
-- CSS3 (Grid, Flexbox, Animations, Gradients)
-- JavaScript (ES6+)
+### Installation
 
-## 🚀 Quick Start
-
-### 1. Install Backend Dependencies
-
-```powershell
-cd server
+```bash
+# Install all dependencies (root + server + client)
 npm install
+cd server && npm install
+cd ../client && npm install
+cd ..
 ```
 
-### 2. Start the Backend Server
+### Seed Database
 
-```powershell
+```bash
+cd server && node seed.js
+```
+
+This creates sample accounts:
+| Role | Email | Password |
+|---|---|---|
+| Recruiter | priya@techcorp.com | password123 |
+| Recruiter | rahul@startupx.com | password123 |
+| Candidate | arjun@email.com | password123 |
+| Candidate | sneha@email.com | password123 |
+| Candidate | vikram@email.com | password123 |
+
+### Run Development
+
+```bash
+# From root — runs both server (port 5000) and client (port 3000)
 npm run dev
 ```
 
-The server will run on `http://localhost:4000`
+Or separately:
+```bash
+# Terminal 1: Server
+cd server && npm run dev
 
-### 3. Open Frontend
+# Terminal 2: Client
+cd client && npm run dev
+```
 
-Open `client/index.html` in any modern web browser.
-
-## 📖 Usage Guide
-
-### Register
-1. Select your role (Candidate or Recruiter)
-2. Enter name, email, and password
-3. Click "Register"
-
-### For Recruiters
-1. Navigate to "Post New Job" section (visible after login)
-2. Fill in job details, description, requirements, and tech tags
-3. Click "Post Job"
-4. Click "View Applications" on any job card to see applications
-5. Score applications and shortlist or reject candidates
-
-### For Candidates
-1. Browse available jobs
-2. Click "Apply Now" on any job
-3. Submit cover letter, project links, and tech skills
-4. Recruiter gets notified and can review your application
+Then open **http://localhost:3000**
 
 ## 📁 Project Structure
 
 ```
-Online Skill Based Hiring/
-├── server/
-│   ├── index.js          # Main Express server
-│   ├── db.js             # SQLite database & schema
-│   ├── auth.js           # Authentication routes
-│   ├── jobs.js           # Job posting & listing
-│   ├── applications.js   # Application submission & scoring
-│   ├── middleware.js     # JWT verification & role checks
-│   └── package.json
-└── client/
-    └── index.html        # Single-page application
+├── client/              # React Frontend (Vite)
+│   ├── src/
+│   │   ├── api/         # Axios client & API services
+│   │   ├── components/  # Reusable UI components
+│   │   ├── context/     # Auth, Notification, Theme providers
+│   │   ├── hooks/       # Custom React hooks
+│   │   ├── pages/       # Page-level components
+│   │   └── utils/       # Helpers & constants
+│   └── ...
+├── server/              # Express Backend
+│   ├── config/          # DB, env, socket setup
+│   ├── controllers/     # Route handlers
+│   ├── middleware/       # Auth, error, rate limiting
+│   ├── models/          # Mongoose schemas
+│   ├── routes/          # API routes
+│   ├── services/        # Email, notifications, assessment
+│   ├── validators/      # Request validation
+│   └── utils/           # Helpers & error classes
+└── package.json         # Root workspace scripts
 ```
 
-## 🔐 Security Features
+## 🔑 API Endpoints
 
-- **JWT Authentication:** Secure token-based authentication
-- **Password Encryption:** Bcrypt hashing with salt rounds
-- **Role-Based Access:** Separate permissions for candidates & recruiters
-- **HTTPS Ready:** Can be configured for production SSL/TLS
+- `POST /api/auth/register` — Register
+- `POST /api/auth/login` — Login
+- `GET /api/jobs` — List jobs (public, filterable)
+- `POST /api/jobs` — Post job (recruiter)
+- `POST /api/applications` — Apply (candidate)
+- `PATCH /api/applications/:id/status` — Update status (recruiter)
+- `PATCH /api/applications/:id/assess` — Score candidate (recruiter)
+- `GET /api/notifications` — Get notifications
 
-## 📧 Email Notifications
+## 📄 License
 
-Currently uses Nodemailer with JSON transport (development mode).
-
-For production, update `server/applications.js` with:
-- Gmail SMTP
-- SendGrid API
-- AWS SES
-- Other email services
-
-## 🎨 UI/UX Highlights
-
-- **Modern Design:** Purple gradient background with smooth animations
-- **Responsive:** Works on desktop, tablet, and mobile
-- **Interactive:** Real-time alerts, modal dialogs, and dynamic content
-- **Accessibility:** Semantic HTML, proper form labels, keyboard navigation
-
-## 🔧 Configuration
-
-Edit `API` variable in `client/index.html` to point to your backend:
-
-```javascript
-const API = 'http://localhost:4000'; // Change if deploying
-```
-
-Edit JWT secret in `server/middleware.js`:
-
-```javascript
-const JWT_SECRET = process.env.JWT_SECRET || 'dev_jwt_secret';
-```
-
-## 📝 Database Schema
-
-**users:** id, name, email, password, role (candidate/recruiter)
-**jobs:** id, title, description, requirements, tech_tags, recruiter_id, created_at
-**applications:** id, job_id, candidate_id, cover_letter, projects, tech_tags, score, status, applied_at
-
-## 🚀 Production Deployment
-
-1. Use environment variables for JWT secret and database path
-2. Enable HTTPS/SSL certificates
-3. Set up a proper email service (not JSON transport)
-4. Add input validation and rate limiting
-5. Enable CORS for your domain
-6. Use a production database (PostgreSQL, MySQL)
-7. Deploy backend to cloud (Heroku, AWS, Azure)
-8. Host frontend on CDN (Vercel, Netlify)
-
-## 📝 License
-
-This project is open source and available for educational purposes.
-
-## 💡 Future Enhancements
-
-- Video interview integration
-- Coding challenge assessment
-- Analytics dashboard
-- Automated candidate screening
-- Integration with LinkedIn/GitHub
-- Payment processing for premium listings
-
+MIT
