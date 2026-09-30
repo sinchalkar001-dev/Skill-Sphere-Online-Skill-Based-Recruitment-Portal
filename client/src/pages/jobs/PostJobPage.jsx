@@ -1,10 +1,19 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { Switch } from '@headlessui/react';
+import { ArrowLeftIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import PageLayout from '../../components/layout/PageLayout';
+import FormSection from '../../components/common/FormSection';
 import TechTagInput from '../../components/jobs/TechTagInput';
-import { PlusCircleIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { ButtonSpinner } from '../../components/common/LoadingSpinner';
 import jobsApi from '../../api/jobsApi';
 import toast from 'react-hot-toast';
+
+const Required = () => (
+  <span className="text-danger-text" aria-hidden="true">
+    {' '}*
+  </span>
+);
 
 const PostJobPage = () => {
   const navigate = useNavigate();
@@ -95,7 +104,7 @@ const PostJobPage = () => {
       };
 
       const { data } = await jobsApi.createJob(payload);
-      toast.success('Job posted successfully!');
+      toast.success('Job posted');
       navigate(`/jobs/${data.data.job._id}`);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to post job');
@@ -104,33 +113,92 @@ const PostJobPage = () => {
     }
   };
 
+  const renderList = (field, singular, placeholder) => (
+    <>
+      {form[field].map((value, i) => (
+        <div key={i} className="flex gap-2">
+          <label htmlFor={`${field}-${i}`} className="sr-only">
+            {singular} {i + 1}
+          </label>
+          <input
+            id={`${field}-${i}`}
+            type="text"
+            value={value}
+            onChange={(e) => updateListItem(field, i, e.target.value)}
+            className="input flex-1"
+            placeholder={i === 0 ? placeholder : `${singular} ${i + 1}`}
+          />
+          {form[field].length > 1 && (
+            <button
+              type="button"
+              onClick={() => removeListItem(field, i)}
+              className="btn-ghost btn-icon h-11 w-11 flex-shrink-0 hover:bg-danger-soft hover:text-danger-soft-foreground"
+              aria-label={`Remove ${singular.toLowerCase()} ${i + 1}`}
+            >
+              <TrashIcon className="h-5 w-5" />
+            </button>
+          )}
+        </div>
+      ))}
+      <button type="button" onClick={() => addListItem(field)} className="btn-soft btn-sm">
+        <PlusIcon aria-hidden="true" className="h-4 w-4" />
+        Add {singular.toLowerCase()}
+      </button>
+    </>
+  );
+
   return (
     <PageLayout>
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8 page-enter">
-        <h1 className="text-2xl font-bold text-surface-100 mb-2">
-          Post a New <span className="gradient-text">Job</span>
-        </h1>
-        <p className="text-surface-400 mb-8">Fill in the details to create a job posting</p>
+      <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:py-10">
+        <Link
+          to="/dashboard"
+          className="inline-flex items-center gap-1.5 rounded text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeftIcon aria-hidden="true" className="h-4 w-4" />
+          Dashboard
+        </Link>
+        <h1 className="page-title mt-6">Post a job</h1>
+        <p className="page-subtitle">Candidates see everything below, so be specific. Fields marked * are required.</p>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Basic Info */}
-          <div className="glass-card p-6 space-y-4">
-            <h2 className="text-lg font-bold text-surface-100">Basic Information</h2>
-
+        <form onSubmit={handleSubmit} className="mt-8 space-y-6">
+          <FormSection id="basics" title="Role basics" description="The title and description are what candidates read first.">
             <div>
-              <label className="block text-sm font-medium text-surface-300 mb-1.5">Job Title *</label>
-              <input type="text" value={form.title} onChange={(e) => updateField('title', e.target.value)} className="input" placeholder="e.g. Senior React Developer" required id="job-title" />
+              <label htmlFor="job-title" className="label">
+                Job title
+                <Required />
+              </label>
+              <input
+                type="text"
+                value={form.title}
+                onChange={(e) => updateField('title', e.target.value)}
+                className="input"
+                placeholder="e.g. Senior React developer"
+                required
+                id="job-title"
+              />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-surface-300 mb-1.5">Description *</label>
-              <textarea value={form.description} onChange={(e) => updateField('description', e.target.value)} className="input min-h-[150px] resize-y" placeholder="Describe the role, team, and expectations..." required id="job-description" />
+              <label htmlFor="job-description" className="label">
+                Description
+                <Required />
+              </label>
+              <textarea
+                value={form.description}
+                onChange={(e) => updateField('description', e.target.value)}
+                className="input min-h-[10rem] resize-y"
+                placeholder="Describe the role, the team, and what success looks like."
+                required
+                id="job-description"
+              />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium text-surface-300 mb-1.5">Job Type</label>
-                <select value={form.jobType} onChange={(e) => updateField('jobType', e.target.value)} className="input">
+                <label htmlFor="job-type" className="label">
+                  Job type
+                </label>
+                <select id="job-type" value={form.jobType} onChange={(e) => updateField('jobType', e.target.value)} className="input">
                   <option value="full-time">Full-time</option>
                   <option value="part-time">Part-time</option>
                   <option value="contract">Contract</option>
@@ -138,29 +206,49 @@ const PostJobPage = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-surface-300 mb-1.5">Experience Level</label>
-                <select value={form.experienceLevel} onChange={(e) => updateField('experienceLevel', e.target.value)} className="input">
-                  <option value="entry">Entry Level</option>
-                  <option value="mid">Mid Level</option>
+                <label htmlFor="job-experience" className="label">
+                  Experience level
+                </label>
+                <select
+                  id="job-experience"
+                  value={form.experienceLevel}
+                  onChange={(e) => updateField('experienceLevel', e.target.value)}
+                  className="input"
+                >
+                  <option value="entry">Entry level</option>
+                  <option value="mid">Mid level</option>
                   <option value="senior">Senior</option>
                   <option value="lead">Lead</option>
                 </select>
               </div>
             </div>
-          </div>
+          </FormSection>
 
-          {/* Location & Salary */}
-          <div className="glass-card p-6 space-y-4">
-            <h2 className="text-lg font-bold text-surface-100">Location & Compensation</h2>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <FormSection id="location-pay" title="Location and pay">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium text-surface-300 mb-1.5">Location</label>
-                <input type="text" value={form.location} onChange={(e) => updateField('location', e.target.value)} className="input" placeholder="e.g. Bangalore, India" />
+                <label htmlFor="job-location" className="label">
+                  Location
+                </label>
+                <input
+                  id="job-location"
+                  type="text"
+                  value={form.location}
+                  onChange={(e) => updateField('location', e.target.value)}
+                  className="input"
+                  placeholder="e.g. Bengaluru, India"
+                />
               </div>
               <div>
-                <label className="block text-sm font-medium text-surface-300 mb-1.5">Location Type</label>
-                <select value={form.locationType} onChange={(e) => updateField('locationType', e.target.value)} className="input">
+                <label htmlFor="job-work-style" className="label">
+                  Work style
+                </label>
+                <select
+                  id="job-work-style"
+                  value={form.locationType}
+                  onChange={(e) => updateField('locationType', e.target.value)}
+                  className="input"
+                >
                   <option value="onsite">On-site</option>
                   <option value="remote">Remote</option>
                   <option value="hybrid">Hybrid</option>
@@ -168,82 +256,171 @@ const PostJobPage = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-surface-300 mb-1.5">Min Salary (₹)</label>
-                <input type="number" value={form.salary.min} onChange={(e) => setForm((prev) => ({ ...prev, salary: { ...prev.salary, min: e.target.value } }))} className="input" placeholder="e.g. 1000000" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-surface-300 mb-1.5">Max Salary (₹)</label>
-                <input type="number" value={form.salary.max} onChange={(e) => setForm((prev) => ({ ...prev, salary: { ...prev.salary, max: e.target.value } }))} className="input" placeholder="e.g. 2000000" />
-              </div>
-            </div>
-          </div>
-
-          {/* Tech Stack */}
-          <div className="glass-card p-6">
-            <h2 className="text-lg font-bold text-surface-100 mb-3">Tech Stack</h2>
-            <TechTagInput tags={form.techStack} onChange={(tags) => updateField('techStack', tags)} />
-          </div>
-
-          {/* Requirements */}
-          <div className="glass-card p-6 space-y-3">
-            <h2 className="text-lg font-bold text-surface-100">Requirements</h2>
-            {form.requirements.map((req, i) => (
-              <div key={i} className="flex gap-2">
-                <input type="text" value={req} onChange={(e) => updateListItem('requirements', i, e.target.value)} className="input flex-1" placeholder={`Requirement ${i + 1}`} />
-                {form.requirements.length > 1 && (
-                  <button type="button" onClick={() => removeListItem('requirements', i)} className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg"><TrashIcon className="h-4 w-4" /></button>
-                )}
-              </div>
-            ))}
-            <button type="button" onClick={() => addListItem('requirements')} className="text-sm text-primary-400 hover:text-primary-300">+ Add requirement</button>
-          </div>
-
-          {/* Responsibilities */}
-          <div className="glass-card p-6 space-y-3">
-            <h2 className="text-lg font-bold text-surface-100">Responsibilities</h2>
-            {form.responsibilities.map((r, i) => (
-              <div key={i} className="flex gap-2">
-                <input type="text" value={r} onChange={(e) => updateListItem('responsibilities', i, e.target.value)} className="input flex-1" placeholder={`Responsibility ${i + 1}`} />
-                {form.responsibilities.length > 1 && (
-                  <button type="button" onClick={() => removeListItem('responsibilities', i)} className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg"><TrashIcon className="h-4 w-4" /></button>
-                )}
-              </div>
-            ))}
-            <button type="button" onClick={() => addListItem('responsibilities')} className="text-sm text-primary-400 hover:text-primary-300">+ Add responsibility</button>
-          </div>
-
-          {/* Assessment */}
-          <div className="glass-card p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold text-surface-100">Assessment Criteria</h2>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={form.assessment.enabled} onChange={(e) => setForm((prev) => ({ ...prev, assessment: { ...prev.assessment, enabled: e.target.checked } }))} className="w-4 h-4 rounded border-surface-600 text-primary-500 focus:ring-primary-500 bg-surface-800" />
-                <span className="text-sm text-surface-300">Enable assessment</span>
-              </label>
-            </div>
-
-            {form.assessment.enabled && (
-              <div className="space-y-3 animate-slide-down">
-                {form.assessment.criteria.map((c, i) => (
-                  <div key={i} className="flex gap-3 items-start p-3 bg-surface-800/30 rounded-xl">
-                    <input type="text" value={c.name} onChange={(e) => updateCriteria(i, 'name', e.target.value)} className="input flex-1" placeholder="e.g. Technical Skills" />
-                    <input type="number" value={c.maxScore} onChange={(e) => updateCriteria(i, 'maxScore', parseInt(e.target.value) || 10)} className="input w-20" placeholder="Max" min={1} />
-                    <input type="number" value={c.weight} onChange={(e) => updateCriteria(i, 'weight', parseInt(e.target.value) || 25)} className="input w-20" placeholder="%" min={1} max={100} />
-                    <button type="button" onClick={() => removeCriteria(i)} className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg mt-1"><TrashIcon className="h-4 w-4" /></button>
+            <div>
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { key: 'min', label: 'Minimum salary per year', placeholder: '1000000' },
+                  { key: 'max', label: 'Maximum salary per year', placeholder: '2000000' },
+                ].map(({ key, label, placeholder }) => (
+                  <div key={key}>
+                    <label htmlFor={`salary-${key}`} className="label">
+                      {label}
+                    </label>
+                    <div className="relative">
+                      <span
+                        aria-hidden="true"
+                        className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground"
+                      >
+                        ₹
+                      </span>
+                      <input
+                        id={`salary-${key}`}
+                        type="number"
+                        inputMode="numeric"
+                        min="0"
+                        value={form.salary[key]}
+                        onChange={(e) => setForm((prev) => ({ ...prev, salary: { ...prev.salary, [key]: e.target.value } }))}
+                        className="input pl-8"
+                        placeholder={placeholder}
+                        aria-describedby="salary-hint"
+                      />
+                    </div>
                   </div>
                 ))}
-                <button type="button" onClick={addCriteria} className="text-sm text-primary-400 hover:text-primary-300">+ Add criteria</button>
               </div>
-            )}
-          </div>
+              <p id="salary-hint" className="hint">
+                Leave both blank to show the salary as &ldquo;Not disclosed&rdquo;.
+              </p>
+            </div>
+          </FormSection>
 
-          {/* Submit */}
-          <div className="flex gap-4">
-            <button type="button" onClick={() => navigate(-1)} className="btn-secondary flex-1">Cancel</button>
-            <button type="submit" disabled={submitting} className="btn-primary flex-1" id="post-job-submit">
-              {submitting ? 'Posting...' : 'Post Job'}
+          <FormSection
+            id="tech-stack"
+            title="Tech stack"
+            description="Candidates search by these, so list the tools the role uses day to day."
+          >
+            <label htmlFor="job-tech-stack" className="sr-only">
+              Add a technology
+            </label>
+            <TechTagInput id="job-tech-stack" tags={form.techStack} onChange={(tags) => updateField('techStack', tags)} />
+          </FormSection>
+
+          <FormSection id="requirements" title="Requirements" description="Skills and experience a candidate needs.">
+            {renderList('requirements', 'Requirement', 'e.g. 3+ years building React applications')}
+          </FormSection>
+
+          <FormSection id="responsibilities" title="Responsibilities" description="What the person will do in this role.">
+            {renderList('responsibilities', 'Responsibility', 'e.g. Own the checkout flow end to end')}
+          </FormSection>
+
+          <FormSection
+            id="assessment"
+            title="Assessment rubric"
+            description="Score every applicant on the same criteria. Weights are relative to each other."
+            action={
+              <Switch
+                checked={form.assessment.enabled}
+                onChange={(enabled) => setForm((prev) => ({ ...prev, assessment: { ...prev.assessment, enabled } }))}
+                className={`relative mt-0.5 inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card ${
+                  form.assessment.enabled ? 'bg-primary' : 'bg-input'
+                }`}
+              >
+                <span className="sr-only">Use an assessment rubric</span>
+                <span
+                  aria-hidden="true"
+                  className={`inline-block h-4 w-4 transform rounded-full bg-card shadow transition-transform duration-150 ${
+                    form.assessment.enabled ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </Switch>
+            }
+          >
+            {form.assessment.enabled && (
+              <>
+                {form.assessment.criteria.length > 0 && (
+                  <div
+                    aria-hidden="true"
+                    className="hidden grid-cols-[1fr_6.5rem_6.5rem_2.75rem] gap-3 text-xs font-medium text-muted-foreground sm:grid"
+                  >
+                    <span>Criterion</span>
+                    <span>Max score</span>
+                    <span>Weight</span>
+                    <span />
+                  </div>
+                )}
+                {form.assessment.criteria.map((c, i) => (
+                  <div
+                    key={i}
+                    className="grid grid-cols-2 gap-3 rounded-lg border border-border bg-muted/40 p-3 sm:grid-cols-[1fr_6.5rem_6.5rem_2.75rem] sm:items-center sm:border-0 sm:bg-transparent sm:p-0"
+                  >
+                    <div className="col-span-2 sm:col-span-1">
+                      <label htmlFor={`criterion-${i}-name`} className="label sm:sr-only">
+                        Criterion
+                      </label>
+                      <input
+                        id={`criterion-${i}-name`}
+                        type="text"
+                        value={c.name}
+                        onChange={(e) => updateCriteria(i, 'name', e.target.value)}
+                        className="input"
+                        placeholder="e.g. Technical skills"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor={`criterion-${i}-max`} className="label sm:sr-only">
+                        Max score
+                      </label>
+                      <input
+                        id={`criterion-${i}-max`}
+                        type="number"
+                        value={c.maxScore}
+                        onChange={(e) => updateCriteria(i, 'maxScore', parseInt(e.target.value) || 10)}
+                        className="input"
+                        min={1}
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor={`criterion-${i}-weight`} className="label sm:sr-only">
+                        Weight
+                      </label>
+                      <input
+                        id={`criterion-${i}-weight`}
+                        type="number"
+                        value={c.weight}
+                        onChange={(e) => updateCriteria(i, 'weight', parseInt(e.target.value) || 25)}
+                        className="input"
+                        min={1}
+                        max={100}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeCriteria(i)}
+                      className="btn-ghost btn-icon col-span-2 h-11 w-11 justify-self-end hover:bg-danger-soft hover:text-danger-soft-foreground sm:col-span-1"
+                      aria-label={`Remove ${c.name || `criterion ${i + 1}`}`}
+                    >
+                      <TrashIcon className="h-5 w-5" />
+                    </button>
+                  </div>
+                ))}
+                {form.assessment.criteria.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No criteria yet. Add the first one to start the rubric.</p>
+                )}
+                <button type="button" onClick={addCriteria} className="btn-soft btn-sm">
+                  <PlusIcon aria-hidden="true" className="h-4 w-4" />
+                  Add criterion
+                </button>
+              </>
+            )}
+          </FormSection>
+
+          <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+            <button type="button" onClick={() => navigate(-1)} className="btn-secondary">
+              Cancel
+            </button>
+            <button type="submit" disabled={submitting} className="btn-primary" id="post-job-submit">
+              {submitting && <ButtonSpinner />}
+              {submitting ? 'Posting…' : 'Post job'}
             </button>
           </div>
         </form>

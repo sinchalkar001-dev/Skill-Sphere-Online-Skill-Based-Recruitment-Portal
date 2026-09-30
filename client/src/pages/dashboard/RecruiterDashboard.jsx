@@ -4,10 +4,12 @@ import {
   BriefcaseIcon,
   UserGroupIcon,
   ChartBarIcon,
-  PlusCircleIcon,
-  EyeIcon,
+  DocumentTextIcon,
+  PlusIcon,
   PencilSquareIcon,
   TrashIcon,
+  PauseIcon,
+  PlayIcon,
 } from '@heroicons/react/24/outline';
 import PageLayout from '../../components/layout/PageLayout';
 import StatsCard from '../../components/dashboard/StatsCard';
@@ -15,6 +17,7 @@ import RecentActivity from '../../components/dashboard/RecentActivity';
 import QuickActions from '../../components/dashboard/QuickActions';
 import { PageLoader } from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
 import jobsApi from '../../api/jobsApi';
@@ -26,6 +29,10 @@ const RecruiterDashboard = () => {
   const { notifications } = useNotifications();
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
+  // The target outlives `confirmOpen` so the dialog keeps its text while it animates out.
+  const [jobToDelete, setJobToDelete] = useState(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const fetchJobs = async () => {
@@ -53,14 +60,18 @@ const RecruiterDashboard = () => {
     }
   };
 
-  const handleDelete = async (jobId) => {
-    if (!confirm('Delete this job and all its applications?')) return;
+  const handleDelete = async () => {
+    if (!jobToDelete) return;
+    setDeleting(true);
     try {
-      await jobsApi.deleteJob(jobId);
-      setJobs((prev) => prev.filter((j) => j._id !== jobId));
+      await jobsApi.deleteJob(jobToDelete._id);
+      setJobs((prev) => prev.filter((j) => j._id !== jobToDelete._id));
       toast.success('Job deleted');
+      setConfirmOpen(false);
     } catch {
       toast.error('Failed to delete job');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -71,145 +82,143 @@ const RecruiterDashboard = () => {
 
   return (
     <PageLayout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 page-enter">
-        {/* Welcome */}
-        <div className="flex items-center justify-between mb-8">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-surface-100">
-              Recruiter Dashboard
-            </h1>
-            <p className="text-surface-400 mt-1">
-              {user?.company?.name || 'Your company'} — Manage jobs and applications
-            </p>
+            <h1 className="page-title">Hiring dashboard</h1>
+            <p className="page-subtitle">Manage roles and applicants for {user?.company?.name || 'your company'}.</p>
           </div>
-          <Link to="/jobs/new" className="btn-primary hidden sm:flex">
-            <PlusCircleIcon className="h-5 w-5" />
-            Post Job
+          <Link to="/jobs/new" className="btn-primary self-start sm:self-auto">
+            <PlusIcon aria-hidden="true" className="h-5 w-5" />
+            Post a job
           </Link>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <dl className="mt-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+          <StatsCard title="Open roles" value={activeJobs} icon={BriefcaseIcon} tone="success" />
+          <StatsCard title="All postings" value={jobs.length} icon={DocumentTextIcon} tone="neutral" />
+          <StatsCard title="Applicants" value={totalApplications} icon={UserGroupIcon} tone="info" />
           <StatsCard
-            title="Total Jobs"
-            value={jobs.length}
-            icon={<BriefcaseIcon className="h-6 w-6 text-primary-400" />}
-            color="primary"
-          />
-          <StatsCard
-            title="Active Jobs"
-            value={activeJobs}
-            icon={<ChartBarIcon className="h-6 w-6 text-emerald-400" />}
-            color="emerald"
-          />
-          <StatsCard
-            title="Total Applicants"
-            value={totalApplications}
-            icon={<UserGroupIcon className="h-6 w-6 text-accent-400" />}
-            color="accent"
-          />
-          <StatsCard
-            title="Avg Applicants/Job"
+            title="Applicants per role"
             value={jobs.length > 0 ? Math.round(totalApplications / jobs.length) : 0}
-            icon={<ChartBarIcon className="h-6 w-6 text-amber-400" />}
-            color="amber"
+            icon={ChartBarIcon}
+            tone="neutral"
           />
-        </div>
+        </dl>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Jobs List */}
-          <div className="lg:col-span-2">
-            <div className="glass-card p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-surface-100">Your Job Postings</h3>
-                <Link to="/jobs/new" className="text-sm text-primary-400 hover:text-primary-300 sm:hidden">
-                  + New Job
-                </Link>
-              </div>
+        <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <section className="card overflow-hidden lg:col-span-2 lg:self-start" aria-labelledby="job-postings-title">
+            <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-4 sm:px-6">
+              <h2 id="job-postings-title" className="section-title">
+                Your job postings
+              </h2>
+              {jobs.length > 0 && <span className="text-sm text-muted-foreground">{jobs.length} total</span>}
+            </div>
 
-              {jobs.length === 0 ? (
-                <EmptyState
-                  icon="📋"
-                  title="No jobs posted yet"
-                  description="Start hiring by posting your first job"
-                  action={
-                    <Link to="/jobs/new" className="btn-primary text-sm">
-                      <PlusCircleIcon className="h-4 w-4" />
-                      Post Your First Job
-                    </Link>
-                  }
-                />
-              ) : (
-                <div className="space-y-3">
-                  {jobs.map((job) => (
-                    <div
+            {jobs.length === 0 ? (
+              <EmptyState
+                icon={BriefcaseIcon}
+                title="No jobs posted yet"
+                description="Post your first role to start receiving applications."
+                action={
+                  <Link to="/jobs/new" className="btn-primary btn-sm">
+                    <PlusIcon aria-hidden="true" className="h-4 w-4" />
+                    Post a job
+                  </Link>
+                }
+              />
+            ) : (
+              <ul className="divide-y divide-border">
+                {jobs.map((job) => {
+                  const applicants = job.applicationsCount || 0;
+                  return (
+                    <li
                       key={job._id}
-                      className="flex items-center justify-between p-4 rounded-xl bg-surface-800/30 hover:bg-surface-700/30 transition-all border border-surface-700/30"
+                      className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6"
                     >
-                      <div className="flex-1 min-w-0 mr-4">
-                        <div className="flex items-center gap-2">
-                          <h4 className="text-sm font-semibold text-surface-100 truncate">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Link
+                            to={`/jobs/${job._id}`}
+                            className="truncate text-sm font-semibold text-foreground hover:text-primary-text sm:text-base"
+                          >
                             {job.title}
-                          </h4>
-                          <span className={`px-2 py-0.5 text-[10px] rounded-full font-medium ${
-                            job.isActive
-                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                              : 'bg-surface-600/20 text-surface-400 border border-surface-600/30'
-                          }`}>
+                          </Link>
+                          <span className={job.isActive ? 'badge-success' : 'badge-neutral'}>
+                            <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />
                             {job.isActive ? 'Active' : 'Paused'}
                           </span>
                         </div>
-                        <div className="flex items-center gap-4 mt-1.5 text-xs text-surface-400">
-                          <span>{job.applicationsCount || 0} applicants</span>
+                        <p className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                          <span>
+                            {applicants} {applicants === 1 ? 'applicant' : 'applicants'}
+                          </span>
                           <span>Posted {formatDate(job.createdAt)}</span>
-                        </div>
+                        </p>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Link
-                          to={`/jobs/${job._id}/applications`}
-                          className="p-2 rounded-lg hover:bg-surface-600/50 text-surface-400 hover:text-primary-400 transition-colors"
-                          title="View Applications"
-                        >
-                          <EyeIcon className="h-4 w-4" />
+
+                      <div className="flex flex-shrink-0 items-center gap-1">
+                        <Link to={`/jobs/${job._id}/applications`} className="btn-secondary btn-sm mr-1">
+                          <UserGroupIcon aria-hidden="true" className="h-4 w-4" />
+                          Review applicants
                         </Link>
+                        <button
+                          type="button"
+                          onClick={() => handleToggle(job._id)}
+                          className="btn-ghost btn-icon"
+                          aria-label={job.isActive ? `Pause ${job.title}` : `Reopen ${job.title}`}
+                          title={job.isActive ? 'Pause' : 'Reopen'}
+                        >
+                          {job.isActive ? <PauseIcon className="h-5 w-5" /> : <PlayIcon className="h-5 w-5" />}
+                        </button>
                         <Link
                           to={`/jobs/${job._id}/edit`}
-                          className="p-2 rounded-lg hover:bg-surface-600/50 text-surface-400 hover:text-amber-400 transition-colors"
+                          className="btn-ghost btn-icon"
+                          aria-label={`Edit ${job.title}`}
                           title="Edit"
                         >
-                          <PencilSquareIcon className="h-4 w-4" />
+                          <PencilSquareIcon className="h-5 w-5" />
                         </Link>
                         <button
-                          onClick={() => handleToggle(job._id)}
-                          className={`p-2 rounded-lg hover:bg-surface-600/50 transition-colors ${
-                            job.isActive ? 'text-surface-400 hover:text-amber-400' : 'text-surface-500 hover:text-emerald-400'
-                          }`}
-                          title={job.isActive ? 'Pause' : 'Activate'}
-                        >
-                          <span className="text-xs">{job.isActive ? '⏸' : '▶'}</span>
-                        </button>
-                        <button
-                          onClick={() => handleDelete(job._id)}
-                          className="p-2 rounded-lg hover:bg-red-500/10 text-surface-400 hover:text-red-400 transition-colors"
+                          type="button"
+                          onClick={() => {
+                            setJobToDelete(job);
+                            setConfirmOpen(true);
+                          }}
+                          className="btn-ghost btn-icon hover:bg-danger-soft hover:text-danger-soft-foreground"
+                          aria-label={`Delete ${job.title}`}
                           title="Delete"
                         >
-                          <TrashIcon className="h-4 w-4" />
+                          <TrashIcon className="h-5 w-5" />
                         </button>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
 
-          {/* Sidebar */}
           <div className="space-y-6">
             <QuickActions role="recruiter" />
             <RecentActivity activities={notifications} />
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={handleDelete}
+        title="Delete this job?"
+        confirmLabel="Delete job"
+        busy={deleting}
+      >
+        <p>
+          <span className="font-semibold text-foreground">{jobToDelete?.title}</span> and all of its applications will be
+          permanently deleted. This can&apos;t be undone.
+        </p>
+      </ConfirmDialog>
     </PageLayout>
   );
 };

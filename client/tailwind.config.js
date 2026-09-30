@@ -1,107 +1,82 @@
 /** @type {import('tailwindcss').Config} */
+
+// Semantic colors resolve to CSS variables (RGB channels) defined in src/index.css,
+// so every utility switches between the light and dark themes and keeps
+// opacity modifiers working (e.g. bg-primary/10).
+const token = (name) => `rgb(var(--${name}) / <alpha-value>)`;
+
+const tone = (name) => ({
+  DEFAULT: token(name),
+  soft: token(`${name}-soft`),
+  'soft-foreground': token(`${name}-soft-foreground`),
+});
+
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   darkMode: 'class',
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        sans: ['"Plus Jakarta Sans"', 'ui-sans-serif', 'system-ui', '-apple-system', '"Segoe UI"', 'sans-serif'],
       },
       colors: {
+        background: token('background'),
+        foreground: token('foreground'),
+        card: token('card'),
+        muted: {
+          DEFAULT: token('muted'),
+          foreground: token('muted-foreground'),
+        },
+        subtle: {
+          foreground: token('subtle-foreground'),
+        },
+        border: {
+          DEFAULT: token('border'),
+          strong: token('border-strong'),
+        },
+        input: token('input'),
+        ring: token('ring'),
         primary: {
-          50: '#eef2ff',
-          100: '#e0e7ff',
-          200: '#c7d2fe',
-          300: '#a5b4fc',
-          400: '#818cf8',
-          500: '#6366f1',
-          600: '#4f46e5',
-          700: '#4338ca',
-          800: '#3730a3',
-          900: '#312e81',
-          950: '#1e1b4b',
+          ...tone('primary'),
+          hover: token('primary-hover'),
+          foreground: token('primary-foreground'),
+          text: token('primary-text'),
         },
-        accent: {
-          50: '#f0fdfa',
-          100: '#ccfbf1',
-          200: '#99f6e4',
-          300: '#5eead4',
-          400: '#2dd4bf',
-          500: '#14b8a6',
-          600: '#0d9488',
-          700: '#0f766e',
-          800: '#115e59',
-          900: '#134e4a',
+        success: tone('success'),
+        warning: tone('warning'),
+        danger: {
+          ...tone('danger'),
+          hover: token('danger-hover'),
+          foreground: token('danger-foreground'),
+          text: token('danger-text'),
         },
-        surface: {
-          50: '#f8fafc',
-          100: '#f1f5f9',
-          200: '#e2e8f0',
-          300: '#cbd5e1',
-          400: '#94a3b8',
-          500: '#64748b',
-          600: '#475569',
-          700: '#334155',
-          800: '#1e293b',
-          900: '#0f172a',
-          950: '#020617',
+        iris: tone('iris'),
+        band: {
+          DEFAULT: token('band'),
+          foreground: token('band-foreground'),
+          muted: token('band-muted'),
         },
-      },
-      backgroundImage: {
-        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'hero-gradient': 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #6366f1 100%)',
-        'card-gradient': 'linear-gradient(135deg, rgba(99,102,241,0.1) 0%, rgba(20,184,166,0.1) 100%)',
-        'glass-gradient': 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',
+        meter: {
+          track: token('meter-track'),
+        },
       },
       boxShadow: {
-        'glass': '0 8px 32px rgba(0, 0, 0, 0.1)',
-        'glass-lg': '0 16px 48px rgba(0, 0, 0, 0.15)',
-        'glow': '0 0 20px rgba(99, 102, 241, 0.3)',
-        'glow-lg': '0 0 40px rgba(99, 102, 241, 0.4)',
-        'card': '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)',
-        'card-hover': '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-      },
-      animation: {
-        'float': 'float 6s ease-in-out infinite',
-        'glow-pulse': 'glowPulse 2s ease-in-out infinite',
-        'slide-up': 'slideUp 0.5s ease-out',
-        'slide-down': 'slideDown 0.3s ease-out',
-        'fade-in': 'fadeIn 0.5s ease-out',
-        'scale-in': 'scaleIn 0.3s ease-out',
-        'shimmer': 'shimmer 2s infinite',
+        overlay: '0 16px 40px -12px rgb(var(--shadow-color) / 0.28), 0 4px 12px -4px rgb(var(--shadow-color) / 0.12)',
+        lift: '0 8px 24px -12px rgb(var(--shadow-color) / 0.35)',
       },
       keyframes: {
-        float: {
-          '0%, 100%': { transform: 'translateY(0px)' },
-          '50%': { transform: 'translateY(-20px)' },
+        'segment-fill': {
+          from: { transform: 'scaleX(0)' },
+          to: { transform: 'scaleX(1)' },
         },
-        glowPulse: {
-          '0%, 100%': { boxShadow: '0 0 20px rgba(99, 102, 241, 0.3)' },
-          '50%': { boxShadow: '0 0 40px rgba(99, 102, 241, 0.6)' },
-        },
-        slideUp: {
-          '0%': { transform: 'translateY(20px)', opacity: '0' },
-          '100%': { transform: 'translateY(0)', opacity: '1' },
-        },
-        slideDown: {
-          '0%': { transform: 'translateY(-10px)', opacity: '0' },
-          '100%': { transform: 'translateY(0)', opacity: '1' },
-        },
-        fadeIn: {
-          '0%': { opacity: '0' },
-          '100%': { opacity: '1' },
-        },
-        scaleIn: {
-          '0%': { transform: 'scale(0.95)', opacity: '0' },
-          '100%': { transform: 'scale(1)', opacity: '1' },
-        },
-        shimmer: {
-          '0%': { backgroundPosition: '-200% 0' },
-          '100%': { backgroundPosition: '200% 0' },
+        'menu-in': {
+          from: { opacity: '0', transform: 'translateY(-4px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
         },
       },
-      backdropBlur: {
-        xs: '2px',
+      animation: {
+        'segment-fill': 'segment-fill 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both',
+        'menu-in': 'menu-in 160ms ease-out',
       },
     },
   },

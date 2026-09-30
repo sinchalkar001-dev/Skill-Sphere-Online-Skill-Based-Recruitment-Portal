@@ -1,4 +1,5 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
@@ -19,6 +20,15 @@ import ManageApplicationsPage from './pages/applications/ManageApplicationsPage'
 import ApplicationDetailPage from './pages/applications/ApplicationDetailPage';
 import ProfilePage from './pages/profile/ProfilePage';
 import NotFoundPage from './pages/NotFoundPage';
+
+// Start each new page at the top; in-page anchors (/#section) handle their own scrolling
+const ScrollToTop = () => {
+  const { pathname, hash } = useLocation();
+  useEffect(() => {
+    if (!hash) window.scrollTo(0, 0);
+  }, [pathname, hash]);
+  return null;
+};
 
 // Protected Route wrapper
 const ProtectedRoute = ({ children, roles }) => {
@@ -79,6 +89,7 @@ const App = () => {
   return (
     <ThemeProvider>
       <Router>
+        <ScrollToTop />
         <AuthProvider>
           <NotificationProvider>
             <AppRoutes />
@@ -87,13 +98,16 @@ const App = () => {
               toastOptions={{
                 duration: 4000,
                 style: {
-                  background: '#1e293b',
-                  color: '#e2e8f0',
-                  border: '1px solid #334155',
-                  borderRadius: '12px',
+                  background: 'rgb(var(--card))',
+                  color: 'rgb(var(--foreground))',
+                  border: '1px solid rgb(var(--border))',
+                  borderRadius: '10px',
+                  boxShadow: '0 16px 40px -12px rgb(var(--shadow-color) / 0.28)',
+                  fontSize: '14px',
+                  fontWeight: 500,
                 },
-                success: { iconTheme: { primary: '#6366f1', secondary: '#fff' } },
-                error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
+                success: { iconTheme: { primary: 'rgb(var(--success))', secondary: 'rgb(var(--card))' } },
+                error: { iconTheme: { primary: 'rgb(var(--danger))', secondary: 'rgb(var(--card))' } },
               }}
             />
           </NotificationProvider>

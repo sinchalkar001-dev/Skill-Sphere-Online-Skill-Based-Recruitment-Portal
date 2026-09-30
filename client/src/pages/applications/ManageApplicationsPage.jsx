@@ -2,18 +2,29 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   ArrowLeftIcon,
-  CheckCircleIcon,
-  XCircleIcon,
+  CheckIcon,
+  XMarkIcon,
   StarIcon,
+  EyeIcon,
+  ClipboardDocumentCheckIcon,
+  InboxIcon,
+  MapPinIcon,
+  BriefcaseIcon,
+  CalendarDaysIcon,
 } from '@heroicons/react/24/outline';
 import PageLayout from '../../components/layout/PageLayout';
 import StatusBadge from '../../components/applications/StatusBadge';
 import Modal from '../../components/common/Modal';
-import { PageLoader } from '../../components/common/LoadingSpinner';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
+import Avatar from '../../components/common/Avatar';
+import ScoreMeter from '../../components/common/ScoreMeter';
+import { PageLoader, ButtonSpinner } from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
 import applicationsApi from '../../api/applicationsApi';
-import { formatDate, getInitials } from '../../utils/helpers';
+import { formatDate, getStatusLabel, APPLICATION_STATUSES } from '../../utils/helpers';
 import toast from 'react-hot-toast';
+
+const statusFilters = [{ value: '', label: 'All' }, ...APPLICATION_STATUSES];
 
 const ManageApplicationsPage = () => {
   const { jobId } = useParams();
@@ -28,6 +39,10 @@ const ManageApplicationsPage = () => {
   const [scores, setScores] = useState([]);
   const [overallFeedback, setOverallFeedback] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Reject confirmation; the target outlives `rejectOpen` so the text stays while the dialog closes
+  const [rejectTarget, setRejectTarget] = useState(null);
+  const [rejectOpen, setRejectOpen] = useState(false);
 
   useEffect(() => {
     const fetchApplications = async () => {
@@ -52,10 +67,15 @@ const ManageApplicationsPage = () => {
       setApplications((prev) =>
         prev.map((a) => (a._id === appId ? { ...a, status: newStatus } : a))
       );
-      toast.success(`Status updated to ${newStatus}`);
+      toast.success(`Status changed to ${getStatusLabel(newStatus)}`);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to update status');
     }
+  };
+
+  const confirmReject = async () => {
+    await handleStatusChange(rejectTarget._id, 'rejected');
+    setRejectOpen(false);
   };
 
   const openAssessment = (app) => {
@@ -70,7 +90,12 @@ const ManageApplicationsPage = () => {
     setAssessOpen(true);
   };
 
-  const handleAssessSubmit = async () => {
+  const updateScore = (index, field, value) => {
+    setScores((prev) => prev.map((s, i) => (i === index ? { ...s, [field]: value } : s)));
+  };
+
+  const handleAssessSubmit = async (e) => {
+    e.preventDefault();
     setSubmitting(true);
     try {
       const { data } = await applicationsApi.assess(selectedApp._id, {
@@ -80,7 +105,7 @@ const ManageApplicationsPage = () => {
       setApplications((prev) =>
         prev.map((a) => (a._id === selectedApp._id ? { ...a, status: 'assessed', assessment: data.data.application.assessment } : a))
       );
-      toast.success('Assessment submitted!');
+      toast.success('Assessment submitted');
       setAssessOpen(false);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Assessment failed');
@@ -93,183 +118,263 @@ const ManageApplicationsPage = () => {
 
   return (
     <PageLayout>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 page-enter">
-        <Link to="/dashboard" className="inline-flex items-center gap-1 text-sm text-surface-400 hover:text-surface-200 mb-4">
-          <ArrowLeftIcon className="h-4 w-4" />
-          Back to Dashboard
+      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+        <Link
+          to="/dashboard"
+          className="inline-flex items-center gap-1.5 rounded text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeftIcon aria-hidden="true" className="h-4 w-4" />
+          Dashboard
         </Link>
 
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-surface-100">Applications</h1>
-            <p className="text-surface-400 mt-1">for "{jobTitle}"</p>
+        <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="page-title">Applicants</h1>
+            {jobTitle && <p className="page-subtitle truncate">{jobTitle}</p>}
           </div>
-          <span className="text-sm text-surface-400">{applications.length} total</span>
+          <p className="text-sm text-muted-foreground">
+            {applications.length} {applications.length === 1 ? 'applicant' : 'applicants'}
+            {statusFilter && ` ${getStatusLabel(statusFilter).toLowerCase()}`}
+          </p>
         </div>
 
-        {/* Status Filter */}
-        <div className="flex flex-wrap gap-2 mb-6">
-          {['', 'applied', 'reviewing', 'shortlisted', 'assessed', 'accepted', 'rejected'].map((s) => (
+        <div
+          role="group"
+          aria-label="Filter by status"
+          className="-mx-4 mt-6 flex gap-1 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0"
+        >
+          {statusFilters.map((s) => (
             <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                statusFilter === s
-                  ? 'bg-primary-600/20 text-primary-400'
-                  : 'text-surface-400 hover:bg-surface-800'
+              key={s.value}
+              type="button"
+              onClick={() => setStatusFilter(s.value)}
+              aria-pressed={statusFilter === s.value}
+              className={`btn btn-sm flex-shrink-0 ${
+                statusFilter === s.value
+                  ? 'bg-primary-soft text-primary-soft-foreground'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               }`}
             >
-              {s || 'All'}
+              {s.label}
             </button>
           ))}
         </div>
 
         {applications.length === 0 ? (
-          <EmptyState icon="📭" title="No applications" description="No applications received for this job yet" />
+          <div className="card mt-4">
+            <EmptyState
+              icon={InboxIcon}
+              titleAs="h2"
+              title="No applicants here yet"
+              description={
+                statusFilter
+                  ? 'No applications have this status. Try another filter.'
+                  : 'Applications for this role will appear here as they arrive.'
+              }
+            />
+          </div>
         ) : (
-          <div className="space-y-4">
-            {applications.map((app) => (
-              <div key={app._id} className="glass-card p-5">
-                <div className="flex items-start justify-between gap-4">
-                  {/* Candidate Info */}
-                  <div className="flex items-start gap-4 flex-1 min-w-0">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center text-white font-bold flex-shrink-0">
-                      {getInitials(app.candidate?.name)}
+          <ul className="mt-4 space-y-4">
+            {applications.map((app) => {
+              const score = app.assessment?.percentageScore;
+              const isFinal = ['accepted', 'rejected'].includes(app.status);
+              return (
+                <li key={app._id} className="card p-5 sm:p-6">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex min-w-0 items-start gap-4">
+                      <Avatar name={app.candidate?.name} size="lg" />
+                      <div className="min-w-0">
+                        <h2 className="text-base font-semibold text-foreground">
+                          <Link to={`/applications/${app._id}`} className="hover:text-primary-text hover:underline">
+                            {app.candidate?.name}
+                          </Link>
+                        </h2>
+                        <p className="truncate text-sm text-muted-foreground">{app.candidate?.email}</p>
+                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                          {app.candidate?.experience != null && (
+                            <span className="flex items-center gap-1.5">
+                              <BriefcaseIcon aria-hidden="true" className="h-4 w-4 text-subtle-foreground" />
+                              {app.candidate.experience} {app.candidate.experience === 1 ? 'year' : 'years'} experience
+                            </span>
+                          )}
+                          {app.candidate?.location && (
+                            <span className="flex items-center gap-1.5">
+                              <MapPinIcon aria-hidden="true" className="h-4 w-4 text-subtle-foreground" />
+                              {app.candidate.location}
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1.5">
+                            <CalendarDaysIcon aria-hidden="true" className="h-4 w-4 text-subtle-foreground" />
+                            Applied {formatDate(app.createdAt)}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-base font-bold text-surface-100">{app.candidate?.name}</h3>
-                      <p className="text-sm text-surface-400">{app.candidate?.email}</p>
 
-                      {app.candidate?.skills?.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {app.candidate.skills.slice(0, 5).map((s) => (
-                            <span key={s} className="px-2 py-0.5 bg-surface-700/50 text-surface-300 text-xs rounded-md">{s}</span>
-                          ))}
+                    <div className="flex flex-row-reverse items-center justify-between gap-3 sm:flex-col sm:items-end">
+                      <StatusBadge status={app.status} />
+                      {score > 0 && (
+                        <div className="flex w-40 items-center gap-2.5">
+                          <ScoreMeter value={score} max={100} size="sm" decorative />
+                          <span className="text-sm font-semibold tabular-nums text-foreground">
+                            <span className="sr-only">Assessment score </span>
+                            {score}%
+                          </span>
                         </div>
                       )}
-
-                      {app.candidate?.experience != null && (
-                        <p className="text-xs text-surface-500 mt-2">{app.candidate.experience} years experience • {app.candidate.location || 'Location N/A'}</p>
-                      )}
-
-                      <p className="text-xs text-surface-500 mt-1">Applied {formatDate(app.createdAt)}</p>
                     </div>
                   </div>
 
-                  {/* Status & Actions */}
-                  <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                    <StatusBadge status={app.status} />
+                  {app.candidate?.skills?.length > 0 && (
+                    <ul className="mt-4 flex flex-wrap gap-1.5" aria-label="Skills">
+                      {app.candidate.skills.slice(0, 6).map((s) => (
+                        <li key={s} className="chip">
+                          {s}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
 
-                    {app.assessment?.percentageScore > 0 && (
-                      <span className="text-sm font-bold text-primary-400">
-                        {app.assessment.percentageScore}%
-                      </span>
-                    )}
+                  {app.coverLetter && (
+                    <div className="mt-4 rounded-lg bg-muted/60 p-4">
+                      <p className="text-xs font-semibold text-muted-foreground">Cover letter</p>
+                      <p className="mt-1 line-clamp-3 text-sm leading-relaxed text-foreground/90">{app.coverLetter}</p>
+                    </div>
+                  )}
 
-                    <div className="flex gap-1 mt-2">
+                  <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-border pt-4">
+                    <Link to={`/applications/${app._id}`} className="btn-ghost btn-sm -ml-2">
+                      View application
+                    </Link>
+                    <div className="ml-auto flex flex-wrap gap-2">
                       {app.status === 'applied' && (
-                        <button onClick={() => handleStatusChange(app._id, 'reviewing')} className="px-3 py-1.5 text-xs rounded-lg bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors">
-                          Review
+                        <button type="button" onClick={() => handleStatusChange(app._id, 'reviewing')} className="btn-secondary btn-sm">
+                          <EyeIcon aria-hidden="true" className="h-4 w-4" />
+                          Start review
                         </button>
                       )}
                       {['applied', 'reviewing'].includes(app.status) && (
-                        <button onClick={() => handleStatusChange(app._id, 'shortlisted')} className="px-3 py-1.5 text-xs rounded-lg bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 transition-colors">
-                          <StarIcon className="h-3.5 w-3.5 inline mr-1" />Shortlist
+                        <button type="button" onClick={() => handleStatusChange(app._id, 'shortlisted')} className="btn-secondary btn-sm">
+                          <StarIcon aria-hidden="true" className="h-4 w-4" />
+                          Shortlist
                         </button>
                       )}
                       {['reviewing', 'shortlisted'].includes(app.status) && (
-                        <button onClick={() => openAssessment(app)} className="px-3 py-1.5 text-xs rounded-lg bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 transition-colors">
+                        <button type="button" onClick={() => openAssessment(app)} className="btn-soft btn-sm">
+                          <ClipboardDocumentCheckIcon aria-hidden="true" className="h-4 w-4" />
                           Assess
                         </button>
                       )}
-                      {!['accepted', 'rejected'].includes(app.status) && (
+                      {!isFinal && (
                         <>
-                          <button onClick={() => handleStatusChange(app._id, 'accepted')} className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors" title="Accept">
-                            <CheckCircleIcon className="h-4 w-4" />
+                          <button type="button" onClick={() => handleStatusChange(app._id, 'accepted')} className="btn-soft-success btn-sm">
+                            <CheckIcon aria-hidden="true" className="h-4 w-4" />
+                            Accept
                           </button>
-                          <button onClick={() => handleStatusChange(app._id, 'rejected')} className="p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors" title="Reject">
-                            <XCircleIcon className="h-4 w-4" />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRejectTarget(app);
+                              setRejectOpen(true);
+                            }}
+                            className="btn-soft-danger btn-sm"
+                          >
+                            <XMarkIcon aria-hidden="true" className="h-4 w-4" />
+                            Reject
                           </button>
                         </>
                       )}
                     </div>
                   </div>
-                </div>
-
-                {/* Cover Letter */}
-                {app.coverLetter && (
-                  <div className="mt-4 pt-4 border-t border-surface-700/30">
-                    <p className="text-xs font-medium text-surface-400 mb-1">Cover Letter</p>
-                    <p className="text-sm text-surface-300 line-clamp-3">{app.coverLetter}</p>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+                </li>
+              );
+            })}
+          </ul>
         )}
       </div>
 
       {/* Assessment Modal */}
-      <Modal isOpen={assessOpen} onClose={() => setAssessOpen(false)} title="Assess Candidate" size="lg">
-        <div className="space-y-4">
-          <p className="text-sm text-surface-400 mb-4">
-            Scoring <span className="text-surface-200 font-medium">{selectedApp?.candidate?.name}</span>
-          </p>
-
+      <Modal
+        isOpen={assessOpen}
+        onClose={() => setAssessOpen(false)}
+        title="Assess candidate"
+        description={selectedApp?.candidate?.name ? `Scoring ${selectedApp.candidate.name}` : undefined}
+        size="lg"
+      >
+        <form onSubmit={handleAssessSubmit} className="space-y-4">
           {scores.map((s, i) => (
-            <div key={i} className="p-4 bg-surface-800/30 rounded-xl space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-surface-200">{s.criteria}</span>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="range"
-                    min="0"
-                    max={s.maxScore}
-                    value={s.score}
-                    onChange={(e) => {
-                      const updated = [...scores];
-                      updated[i].score = parseInt(e.target.value);
-                      setScores(updated);
-                    }}
-                    className="w-24 accent-primary-500"
-                  />
-                  <span className="text-sm font-bold text-primary-400 w-12 text-right">
-                    {s.score}/{s.maxScore}
-                  </span>
-                </div>
+            <fieldset key={s.criteria} className="rounded-xl border border-border bg-muted/40 p-4">
+              <legend className="sr-only">{s.criteria}</legend>
+              <div className="flex items-center justify-between gap-4">
+                <label htmlFor={`score-${i}`} className="text-sm font-semibold text-foreground">
+                  {s.criteria}
+                </label>
+                <span className="text-sm font-semibold tabular-nums text-foreground" aria-hidden="true">
+                  {s.score}/{s.maxScore}
+                </span>
               </div>
               <input
+                id={`score-${i}`}
+                type="range"
+                min="0"
+                max={s.maxScore}
+                value={s.score}
+                onChange={(e) => updateScore(i, 'score', parseInt(e.target.value))}
+                aria-valuetext={`${s.score} out of ${s.maxScore}`}
+                className="mt-3 w-full cursor-pointer accent-primary"
+              />
+              <ScoreMeter value={s.score} max={s.maxScore} size="sm" className="mt-2" decorative />
+              <label htmlFor={`feedback-${i}`} className="sr-only">
+                Feedback on {s.criteria}
+              </label>
+              <input
+                id={`feedback-${i}`}
                 type="text"
                 value={s.feedback}
-                onChange={(e) => {
-                  const updated = [...scores];
-                  updated[i].feedback = e.target.value;
-                  setScores(updated);
-                }}
-                className="input text-sm"
-                placeholder="Feedback for this criteria..."
+                onChange={(e) => updateScore(i, 'feedback', e.target.value)}
+                className="input mt-3"
+                placeholder="Feedback on this criterion (optional)"
               />
-            </div>
+            </fieldset>
           ))}
 
           <div>
-            <label className="block text-sm font-medium text-surface-300 mb-1.5">Overall Feedback</label>
+            <label htmlFor="overall-feedback" className="label">
+              Overall feedback
+            </label>
             <textarea
+              id="overall-feedback"
               value={overallFeedback}
               onChange={(e) => setOverallFeedback(e.target.value)}
-              className="input min-h-[80px] resize-y"
-              placeholder="Overall assessment notes..."
+              className="input min-h-[5rem] resize-y"
+              placeholder="Summary the candidate will see with their score"
             />
           </div>
 
-          <div className="flex gap-3 pt-2">
-            <button onClick={() => setAssessOpen(false)} className="btn-secondary flex-1">Cancel</button>
-            <button onClick={handleAssessSubmit} disabled={submitting} className="btn-primary flex-1">
-              {submitting ? 'Submitting...' : 'Submit Assessment'}
+          <div className="flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:justify-end">
+            <button type="button" onClick={() => setAssessOpen(false)} className="btn-secondary">
+              Cancel
+            </button>
+            <button type="submit" disabled={submitting} className="btn-primary">
+              {submitting && <ButtonSpinner />}
+              {submitting ? 'Submitting…' : 'Submit assessment'}
             </button>
           </div>
-        </div>
+        </form>
       </Modal>
+
+      <ConfirmDialog
+        isOpen={rejectOpen}
+        onClose={() => setRejectOpen(false)}
+        onConfirm={confirmReject}
+        title="Reject this application?"
+        confirmLabel="Reject"
+      >
+        <p>
+          <span className="font-semibold text-foreground">{rejectTarget?.candidate?.name}</span> will get an email and an
+          in-app notification that their application was rejected.
+        </p>
+      </ConfirmDialog>
     </PageLayout>
   );
 };

@@ -1,4 +1,4 @@
-import { useState, Fragment } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Menu, Transition } from '@headlessui/react';
 import {
@@ -7,23 +7,37 @@ import {
   BellIcon,
   UserCircleIcon,
   ArrowRightOnRectangleIcon,
-  SunIcon,
-  MoonIcon,
-  BriefcaseIcon,
   ChevronDownIcon,
+  Squares2X2Icon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
-import { useTheme } from '../../context/ThemeContext';
 import { formatTimeAgo } from '../../utils/helpers';
+import Logo from '../common/Logo';
+import Avatar from '../common/Avatar';
+import ThemeToggle from '../common/ThemeToggle';
+import NotificationIcon from '../notifications/NotificationIcon';
+
+const menuTransition = {
+  as: Fragment,
+  enter: 'transition ease-out duration-150',
+  enterFrom: 'opacity-0 -translate-y-1',
+  enterTo: 'opacity-100 translate-y-0',
+  leave: 'transition ease-in duration-100',
+  leaveFrom: 'opacity-100',
+  leaveTo: 'opacity-0',
+};
 
 const Header = () => {
   const { user, isAuthenticated, logout } = useAuth();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
-  const { isDark, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname, location.hash]);
 
   const handleLogout = async () => {
     await logout();
@@ -51,250 +65,238 @@ const Header = () => {
         { name: 'Dashboard', path: '/dashboard' },
         { name: 'Jobs', path: '/jobs' },
         ...(user?.role === 'candidate'
-          ? [{ name: 'My Applications', path: '/applications' }]
-          : [{ name: 'Post Job', path: '/jobs/new' }]),
+          ? [{ name: 'My applications', path: '/applications' }]
+          : [{ name: 'Post a job', path: '/jobs/new' }]),
       ]
     : [
         { name: 'Jobs', path: '/jobs' },
-        { name: 'About', path: '/#features' },
+        { name: 'How it works', path: '/#how-it-works' },
       ];
 
   const isActive = (path) => location.pathname === path;
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-surface-900/80 backdrop-blur-xl border-b border-surface-700/50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 group">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center shadow-glow group-hover:shadow-glow-lg transition-shadow">
-              <BriefcaseIcon className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-xl font-bold gradient-text hidden sm:block">
-              Skill Sphere
-            </span>
-          </Link>
+    <header className="sticky top-0 z-40 w-full border-b border-border bg-card/90 backdrop-blur-md">
+      <div className="mx-auto flex h-16 max-w-7xl items-center gap-8 px-4 sm:px-6 lg:px-8">
+        <Link to="/" aria-label="Skill Sphere home" className="flex-shrink-0 rounded-lg">
+          <Logo />
+        </Link>
 
-          {/* Desktop Nav */}
-          <nav className="hidden md:flex items-center gap-1">
+        <nav aria-label="Main" className="hidden h-full items-center gap-1 md:flex">
+          {navLinks.map((link) => (
+            <Link
+              key={link.path}
+              to={link.path}
+              aria-current={isActive(link.path) ? 'page' : undefined}
+              className={`inline-flex h-full items-center border-b-2 px-3 text-sm font-medium transition-colors ${
+                isActive(link.path)
+                  ? 'border-primary text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {link.name}
+            </Link>
+          ))}
+        </nav>
+
+        <div className="ml-auto flex items-center gap-1">
+          <ThemeToggle />
+
+          {isAuthenticated ? (
+            <>
+              {/* Notifications */}
+              <Menu as="div" className="relative">
+                <Menu.Button
+                  className="btn-ghost btn-icon relative"
+                  aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+                >
+                  <BellIcon className="h-5 w-5" />
+                  {unreadCount > 0 && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute right-1 top-1 flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-danger px-1 text-[11px] font-bold leading-none text-danger-foreground ring-2 ring-card"
+                    >
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </Menu.Button>
+
+                <Transition {...menuTransition}>
+                  <Menu.Items className="menu-panel fixed inset-x-4 top-[4.25rem] z-50 overflow-hidden sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-96">
+                    <div className="flex items-center justify-between gap-4 border-b border-border px-4 py-3">
+                      <h2 className="text-sm font-semibold text-foreground">Notifications</h2>
+                      {unreadCount > 0 && (
+                        <Menu.Item>
+                          {({ active }) => (
+                            <button
+                              type="button"
+                              onClick={markAllAsRead}
+                              className={`rounded text-xs font-semibold text-primary-text ${active ? 'underline' : ''}`}
+                            >
+                              Mark all as read
+                            </button>
+                          )}
+                        </Menu.Item>
+                      )}
+                    </div>
+                    <div className="max-h-[22rem] overflow-y-auto py-1">
+                      {notifications.length === 0 ? (
+                        <div className="px-6 py-10 text-center">
+                          <p className="text-sm font-medium text-foreground">You&apos;re all caught up</p>
+                          <p className="mt-1 text-xs text-muted-foreground">New updates will show up here.</p>
+                        </div>
+                      ) : (
+                        notifications.slice(0, 8).map((notif) => (
+                          <Menu.Item key={notif._id}>
+                            {({ active }) => (
+                              <button
+                                type="button"
+                                onClick={() => handleNotificationClick(notif)}
+                                className={`flex w-full gap-3 px-4 py-3 text-left transition-colors ${active ? 'bg-muted' : ''}`}
+                              >
+                                <NotificationIcon type={notif.type} />
+                                <span className="min-w-0 flex-1">
+                                  <span className="flex items-start gap-2">
+                                    <span
+                                      className={`min-w-0 flex-1 truncate text-sm text-foreground ${
+                                        notif.isRead ? 'font-medium' : 'font-semibold'
+                                      }`}
+                                    >
+                                      {notif.title}
+                                    </span>
+                                    {!notif.isRead && (
+                                      <span className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-primary">
+                                        <span className="sr-only">Unread</span>
+                                      </span>
+                                    )}
+                                  </span>
+                                  <span className="mt-0.5 line-clamp-2 block text-xs text-muted-foreground">
+                                    {notif.message}
+                                  </span>
+                                  <span className="mt-1 block text-xs text-subtle-foreground">
+                                    {formatTimeAgo(notif.createdAt)}
+                                  </span>
+                                </span>
+                              </button>
+                            )}
+                          </Menu.Item>
+                        ))
+                      )}
+                    </div>
+                  </Menu.Items>
+                </Transition>
+              </Menu>
+
+              {/* Account */}
+              <Menu as="div" className="relative">
+                <Menu.Button
+                  className="flex items-center gap-2 rounded-lg p-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:pr-2"
+                  aria-label={`Account menu for ${user?.name || 'your account'}`}
+                >
+                  <Avatar name={user?.name} size="sm" />
+                  <span className="hidden max-w-[9rem] truncate text-sm font-medium text-foreground lg:block">
+                    {user?.name}
+                  </span>
+                  <ChevronDownIcon aria-hidden="true" className="hidden h-4 w-4 text-muted-foreground lg:block" />
+                </Menu.Button>
+
+                <Transition {...menuTransition}>
+                  <Menu.Items className="menu-panel absolute right-0 z-50 mt-2 w-64 py-1.5">
+                    <div className="border-b border-border px-4 pb-3 pt-2">
+                      <p className="truncate text-sm font-semibold text-foreground">{user?.name}</p>
+                      <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
+                      <span className="badge-info mt-2 capitalize">{user?.role}</span>
+                    </div>
+                    <div className="py-1">
+                      {[
+                        { to: '/dashboard', label: 'Dashboard', Icon: Squares2X2Icon },
+                        { to: '/profile', label: 'Profile', Icon: UserCircleIcon },
+                      ].map(({ to, label, Icon }) => (
+                        <Menu.Item key={to}>
+                          {({ active }) => (
+                            <Link
+                              to={to}
+                              className={`flex items-center gap-3 px-4 py-2 text-sm text-foreground ${active ? 'bg-muted' : ''}`}
+                            >
+                              <Icon aria-hidden="true" className="h-5 w-5 text-muted-foreground" />
+                              {label}
+                            </Link>
+                          )}
+                        </Menu.Item>
+                      ))}
+                    </div>
+                    <div className="border-t border-border pt-1">
+                      <Menu.Item>
+                        {({ active }) => (
+                          <button
+                            type="button"
+                            onClick={handleLogout}
+                            className={`flex w-full items-center gap-3 px-4 py-2 text-sm text-foreground ${active ? 'bg-muted' : ''}`}
+                          >
+                            <ArrowRightOnRectangleIcon aria-hidden="true" className="h-5 w-5 text-muted-foreground" />
+                            Log out
+                          </button>
+                        )}
+                      </Menu.Item>
+                    </div>
+                  </Menu.Items>
+                </Transition>
+              </Menu>
+            </>
+          ) : (
+            <div className="hidden items-center gap-2 md:flex">
+              <Link to="/login" className="btn-ghost btn-sm">
+                Log in
+              </Link>
+              <Link to="/register" className="btn-primary btn-sm">
+                Create account
+              </Link>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((open) => !open)}
+            className="btn-ghost btn-icon md:hidden"
+            aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-menu"
+          >
+            {mobileMenuOpen ? <XMarkIcon className="h-6 w-6" /> : <Bars3Icon className="h-6 w-6" />}
+          </button>
+        </div>
+      </div>
+
+      {mobileMenuOpen && (
+        <div id="mobile-menu" className="border-t border-border bg-card md:hidden">
+          <nav aria-label="Main" className="space-y-1 px-4 py-3">
             {navLinks.map((link) => (
               <Link
                 key={link.path}
                 to={link.path}
-                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                aria-current={isActive(link.path) ? 'page' : undefined}
+                className={`block rounded-lg px-3 py-2.5 text-sm font-medium ${
                   isActive(link.path)
-                    ? 'bg-primary-600/20 text-primary-400'
-                    : 'text-surface-300 hover:text-surface-100 hover:bg-surface-800'
+                    ? 'bg-primary-soft text-primary-soft-foreground'
+                    : 'text-foreground hover:bg-muted'
                 }`}
               >
                 {link.name}
               </Link>
             ))}
-          </nav>
-
-          {/* Right Side */}
-          <div className="flex items-center gap-2">
-            {/* Theme Toggle */}
-            <button
-              onClick={toggleTheme}
-              className="p-2 rounded-xl hover:bg-surface-800 transition-colors text-surface-400 hover:text-surface-200"
-              aria-label="Toggle theme"
-            >
-              {isDark ? <SunIcon className="h-5 w-5" /> : <MoonIcon className="h-5 w-5" />}
-            </button>
-
-            {isAuthenticated ? (
-              <>
-                {/* Notifications */}
-                <Menu as="div" className="relative">
-                  <Menu.Button className="relative p-2 rounded-xl hover:bg-surface-800 transition-colors text-surface-400 hover:text-surface-200">
-                    <BellIcon className="h-5 w-5" />
-                    {unreadCount > 0 && (
-                      <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-scale-in">
-                        {unreadCount > 9 ? '9+' : unreadCount}
-                      </span>
-                    )}
-                  </Menu.Button>
-
-                  <Transition
-                    as={Fragment}
-                    enter="transition ease-out duration-200"
-                    enterFrom="opacity-0 translate-y-1"
-                    enterTo="opacity-100 translate-y-0"
-                    leave="transition ease-in duration-150"
-                    leaveFrom="opacity-100 translate-y-0"
-                    leaveTo="opacity-0 translate-y-1"
-                  >
-                    <Menu.Items className="absolute right-0 mt-2 w-80 glass-card overflow-hidden focus:outline-none">
-                      <div className="px-4 py-3 border-b border-surface-700/50 flex items-center justify-between">
-                        <h3 className="font-semibold text-surface-100">Notifications</h3>
-                        {unreadCount > 0 && (
-                          <button
-                            onClick={markAllAsRead}
-                            className="text-xs text-primary-400 hover:text-primary-300"
-                          >
-                            Mark all read
-                          </button>
-                        )}
-                      </div>
-                      <div className="max-h-72 overflow-y-auto">
-                        {notifications.length === 0 ? (
-                          <div className="py-8 text-center text-surface-400 text-sm">
-                            No notifications yet
-                          </div>
-                        ) : (
-                          notifications.slice(0, 8).map((notif) => (
-                            <Menu.Item key={notif._id}>
-                              {({ active }) => (
-                                <button
-                                  onClick={() => handleNotificationClick(notif)}
-                                  className={`w-full text-left px-4 py-3 transition-colors ${
-                                    active ? 'bg-surface-700/50' : ''
-                                  } ${!notif.isRead ? 'bg-primary-500/5 border-l-2 border-primary-500' : ''}`}
-                                >
-                                  <p className="text-sm font-medium text-surface-200 truncate">
-                                    {notif.title}
-                                  </p>
-                                  <p className="text-xs text-surface-400 mt-0.5 truncate">
-                                    {notif.message}
-                                  </p>
-                                  <p className="text-[10px] text-surface-500 mt-1">
-                                    {formatTimeAgo(notif.createdAt)}
-                                  </p>
-                                </button>
-                              )}
-                            </Menu.Item>
-                          ))
-                        )}
-                      </div>
-                    </Menu.Items>
-                  </Transition>
-                </Menu>
-
-                {/* Profile Menu */}
-                <Menu as="div" className="relative">
-                  <Menu.Button className="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-surface-800 transition-colors">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center text-white text-sm font-bold">
-                      {user?.name?.[0]?.toUpperCase() || '?'}
-                    </div>
-                    <span className="hidden lg:block text-sm font-medium text-surface-200 max-w-[120px] truncate">
-                      {user?.name}
-                    </span>
-                    <ChevronDownIcon className="hidden lg:block h-4 w-4 text-surface-400" />
-                  </Menu.Button>
-
-                  <Transition
-                    as={Fragment}
-                    enter="transition ease-out duration-200"
-                    enterFrom="opacity-0 translate-y-1"
-                    enterTo="opacity-100 translate-y-0"
-                    leave="transition ease-in duration-150"
-                    leaveFrom="opacity-100 translate-y-0"
-                    leaveTo="opacity-0 translate-y-1"
-                  >
-                    <Menu.Items className="absolute right-0 mt-2 w-56 glass-card py-2 focus:outline-none">
-                      <div className="px-4 py-2 border-b border-surface-700/50 mb-1">
-                        <p className="text-sm font-medium text-surface-200">{user?.name}</p>
-                        <p className="text-xs text-surface-400">{user?.email}</p>
-                        <span className="inline-block mt-1 px-2 py-0.5 bg-primary-500/20 text-primary-400 text-[10px] font-semibold rounded-full uppercase">
-                          {user?.role}
-                        </span>
-                      </div>
-                      <Menu.Item>
-                        {({ active }) => (
-                          <Link
-                            to="/profile"
-                            className={`flex items-center gap-3 px-4 py-2 text-sm ${
-                              active ? 'bg-surface-700/50 text-surface-100' : 'text-surface-300'
-                            }`}
-                          >
-                            <UserCircleIcon className="h-4 w-4" />
-                            Profile
-                          </Link>
-                        )}
-                      </Menu.Item>
-                      <Menu.Item>
-                        {({ active }) => (
-                          <button
-                            onClick={handleLogout}
-                            className={`flex items-center gap-3 w-full px-4 py-2 text-sm ${
-                              active ? 'bg-red-500/10 text-red-400' : 'text-surface-300'
-                            }`}
-                          >
-                            <ArrowRightOnRectangleIcon className="h-4 w-4" />
-                            Logout
-                          </button>
-                        )}
-                      </Menu.Item>
-                    </Menu.Items>
-                  </Transition>
-                </Menu>
-              </>
-            ) : (
-              <div className="hidden md:flex items-center gap-2">
-                <Link to="/login" className="btn-ghost text-sm">
+            {!isAuthenticated && (
+              <div className="mt-2 grid grid-cols-2 gap-2 border-t border-border pt-3">
+                <Link to="/login" className="btn-secondary">
                   Log in
                 </Link>
-                <Link to="/register" className="btn-primary text-sm">
-                  Get Started
+                <Link to="/register" className="btn-primary">
+                  Create account
                 </Link>
               </div>
             )}
-
-            {/* Mobile menu button */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-xl hover:bg-surface-800 transition-colors text-surface-400"
-            >
-              {mobileMenuOpen ? (
-                <XMarkIcon className="h-6 w-6" />
-              ) : (
-                <Bars3Icon className="h-6 w-6" />
-              )}
-            </button>
-          </div>
+          </nav>
         </div>
-
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className="md:hidden py-4 border-t border-surface-700/50 animate-slide-down">
-            <nav className="flex flex-col gap-1">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.path}
-                  to={link.path}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                    isActive(link.path)
-                      ? 'bg-primary-600/20 text-primary-400'
-                      : 'text-surface-300 hover:bg-surface-800'
-                  }`}
-                >
-                  {link.name}
-                </Link>
-              ))}
-              {!isAuthenticated && (
-                <>
-                  <Link
-                    to="/login"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="px-4 py-2.5 rounded-xl text-sm font-medium text-surface-300 hover:bg-surface-800"
-                  >
-                    Log in
-                  </Link>
-                  <Link
-                    to="/register"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="btn-primary text-sm mx-4 mt-2"
-                  >
-                    Get Started
-                  </Link>
-                </>
-              )}
-            </nav>
-          </div>
-        )}
-      </div>
+      )}
     </header>
   );
 };

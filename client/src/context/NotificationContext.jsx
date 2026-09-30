@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { io } from 'socket.io-client';
+import { BellIcon } from '@heroicons/react/24/outline';
 import { useAuth } from './AuthContext';
 import notificationsApi from '../api/notificationsApi';
 import toast from 'react-hot-toast';
@@ -31,12 +32,7 @@ export const NotificationProvider = ({ children }) => {
       setNotifications((prev) => [notification, ...prev]);
       setUnreadCount((prev) => prev + 1);
       toast(notification.title, {
-        icon: '🔔',
-        style: {
-          background: '#1e293b',
-          color: '#e2e8f0',
-          border: '1px solid #334155',
-        },
+        icon: <BellIcon aria-hidden="true" className="h-5 w-5 flex-shrink-0 text-primary-text" />,
       });
     });
 

@@ -1,10 +1,18 @@
 import { useState, useEffect } from 'react';
-import { BriefcaseIcon, DocumentCheckIcon, StarIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { Link } from 'react-router-dom';
+import {
+  CheckBadgeIcon,
+  DocumentTextIcon,
+  StarIcon,
+  ClockIcon,
+  MagnifyingGlassIcon,
+} from '@heroicons/react/24/outline';
 import PageLayout from '../../components/layout/PageLayout';
 import StatsCard from '../../components/dashboard/StatsCard';
 import RecentActivity from '../../components/dashboard/RecentActivity';
 import QuickActions from '../../components/dashboard/QuickActions';
 import ApplicationCard from '../../components/applications/ApplicationCard';
+import EmptyState from '../../components/common/EmptyState';
 import { PageLoader } from '../../components/common/LoadingSpinner';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
@@ -46,65 +54,59 @@ const CandidateDashboard = () => {
 
   return (
     <PageLayout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 page-enter">
-        {/* Welcome */}
-        <div className="mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-surface-100">
-            Welcome back, <span className="gradient-text">{user?.name?.split(' ')[0]}</span> 👋
-          </h1>
-          <p className="text-surface-400 mt-1">Here&apos;s what&apos;s happening with your applications</p>
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="page-title">Welcome back, {user?.name?.split(' ')[0]}</h1>
+            <p className="page-subtitle">Here&apos;s where your applications stand.</p>
+          </div>
+          <Link to="/jobs" className="btn-primary self-start sm:self-auto">
+            <MagnifyingGlassIcon aria-hidden="true" className="h-5 w-5" />
+            Browse jobs
+          </Link>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <StatsCard
-            title="Total Applications"
-            value={stats.total}
-            icon={<DocumentCheckIcon className="h-6 w-6 text-primary-400" />}
-            color="primary"
-          />
-          <StatsCard
-            title="Under Review"
-            value={stats.reviewing}
-            icon={<ClockIcon className="h-6 w-6 text-amber-400" />}
-            color="amber"
-          />
-          <StatsCard
-            title="Shortlisted"
-            value={stats.shortlisted}
-            icon={<StarIcon className="h-6 w-6 text-accent-400" />}
-            color="accent"
-          />
-          <StatsCard
-            title="Accepted"
-            value={stats.accepted}
-            icon={<BriefcaseIcon className="h-6 w-6 text-emerald-400" />}
-            color="emerald"
-          />
-        </div>
+        <dl className="mt-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+          <StatsCard title="Applications" value={stats.total} icon={DocumentTextIcon} tone="neutral" />
+          <StatsCard title="In review" value={stats.reviewing} icon={ClockIcon} tone="warning" />
+          <StatsCard title="Shortlisted" value={stats.shortlisted} icon={StarIcon} tone="info" />
+          <StatsCard title="Accepted" value={stats.accepted} icon={CheckBadgeIcon} tone="success" />
+        </dl>
 
-        {/* Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Recent Applications */}
-          <div className="lg:col-span-2">
-            <div className="glass-card p-6">
-              <h3 className="text-lg font-bold text-surface-100 mb-4">Recent Applications</h3>
-              {applications.length === 0 ? (
-                <div className="text-center py-8 text-surface-400">
-                  <p className="mb-2">No applications yet</p>
-                  <a href="/jobs" className="text-primary-400 hover:text-primary-300 text-sm">Browse jobs →</a>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {applications.map((app) => (
-                    <ApplicationCard key={app._id} application={app} />
-                  ))}
-                </div>
+        <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <section className="card overflow-hidden lg:col-span-2 lg:self-start" aria-labelledby="recent-applications-title">
+            <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-4 sm:px-6">
+              <h2 id="recent-applications-title" className="section-title">
+                Recent applications
+              </h2>
+              {applications.length > 0 && (
+                <Link to="/applications" className="link text-sm">
+                  View all
+                </Link>
               )}
             </div>
-          </div>
+            {applications.length === 0 ? (
+              <EmptyState
+                icon={DocumentTextIcon}
+                title="No applications yet"
+                description="Find a role that fits your skills and apply with your projects."
+                action={
+                  <Link to="/jobs" className="btn-primary btn-sm">
+                    Browse jobs
+                  </Link>
+                }
+              />
+            ) : (
+              <ul className="divide-y divide-border">
+                {applications.map((app) => (
+                  <li key={app._id}>
+                    <ApplicationCard application={app} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
 
-          {/* Sidebar */}
           <div className="space-y-6">
             <QuickActions role="candidate" />
             <RecentActivity activities={notifications} />

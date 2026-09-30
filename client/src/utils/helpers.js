@@ -21,27 +21,34 @@ export const formatTimeAgo = (date) => {
 export const formatSalary = (salary) => {
   if (!salary || (!salary.min && !salary.max)) return 'Not disclosed';
   const formatNum = (n) => {
-    if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`;
-    if (n >= 1000) return `₹${(n / 1000).toFixed(0)}K`;
+    if (n >= 100000) return `₹${parseFloat((n / 100000).toFixed(1))}L`;
+    if (n >= 1000) return `₹${Math.round(n / 1000)}K`;
     return `₹${n}`;
   };
+  const periods = { yearly: 'yr', monthly: 'mo', hourly: 'hr' };
+  const period = periods[salary.period] || salary.period || 'yr';
   if (salary.min && salary.max) {
-    return `${formatNum(salary.min)} - ${formatNum(salary.max)} / ${salary.period || 'yr'}`;
+    return `${formatNum(salary.min)}–${formatNum(salary.max)} / ${period}`;
   }
-  return salary.min ? `From ${formatNum(salary.min)}` : `Up to ${formatNum(salary.max)}`;
+  return salary.min ? `From ${formatNum(salary.min)} / ${period}` : `Up to ${formatNum(salary.max)} / ${period}`;
 };
 
-export const getStatusColor = (status) => {
-  const colors = {
-    applied: 'badge-applied',
-    reviewing: 'badge-reviewing',
-    shortlisted: 'badge-shortlisted',
-    assessed: 'badge-assessed',
-    accepted: 'badge-accepted',
-    rejected: 'badge-rejected',
-  };
-  return colors[status] || 'badge-applied';
-};
+// Application pipeline, in order. Badge classes are written out in full so Tailwind keeps them.
+export const APPLICATION_STATUSES = [
+  { value: 'applied', label: 'Applied', badge: 'badge-neutral' },
+  { value: 'reviewing', label: 'In review', badge: 'badge-warning' },
+  { value: 'shortlisted', label: 'Shortlisted', badge: 'badge-info' },
+  { value: 'assessed', label: 'Assessed', badge: 'badge-iris' },
+  { value: 'accepted', label: 'Accepted', badge: 'badge-success' },
+  { value: 'rejected', label: 'Rejected', badge: 'badge-danger' },
+];
+
+const findStatus = (status) =>
+  APPLICATION_STATUSES.find((s) => s.value === status) || APPLICATION_STATUSES[0];
+
+export const getStatusLabel = (status) => findStatus(status).label;
+
+export const getStatusColor = (status) => findStatus(status).badge;
 
 export const getInitials = (name) => {
   if (!name) return '?';
@@ -59,7 +66,7 @@ export const truncateText = (text, maxLength = 150) => {
 };
 
 export const getLocationTypeLabel = (type) => {
-  const labels = { remote: '🏠 Remote', onsite: '🏢 On-site', hybrid: '🔄 Hybrid' };
+  const labels = { remote: 'Remote', onsite: 'On-site', hybrid: 'Hybrid' };
   return labels[type] || type;
 };
 

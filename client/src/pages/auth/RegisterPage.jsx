@@ -1,187 +1,231 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { EyeIcon, EyeSlashIcon, BriefcaseIcon, UserIcon, BuildingOffice2Icon } from '@heroicons/react/24/outline';
+import { useState, useRef } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  EyeIcon,
+  EyeSlashIcon,
+  UserIcon,
+  BuildingOffice2Icon,
+  ExclamationCircleIcon,
+} from '@heroicons/react/24/outline';
+import { CheckCircleIcon } from '@heroicons/react/20/solid';
 import { useAuth } from '../../context/AuthContext';
+import AuthLayout from '../../components/layout/AuthLayout';
+import { ButtonSpinner } from '../../components/common/LoadingSpinner';
 import toast from 'react-hot-toast';
 
+const ROLES = [
+  { value: 'candidate', label: 'Find a job', description: 'Apply with your projects', icon: UserIcon },
+  { value: 'recruiter', label: 'Hire', description: 'Post roles and score applicants', icon: BuildingOffice2Icon },
+];
+
 const RegisterPage = () => {
-  const { register, isLoading } = useAuth();
+  const { register } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const confirmRef = useRef(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [confirmTouched, setConfirmTouched] = useState(false);
   const [form, setForm] = useState({
     name: '',
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'candidate',
+    role: searchParams.get('role') === 'recruiter' ? 'recruiter' : 'candidate',
     company: { name: '' },
   });
 
+  const passwordsMismatch = form.confirmPassword.length > 0 && form.password !== form.confirmPassword;
+  const showMismatch = confirmTouched && passwordsMismatch;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
     if (form.password !== form.confirmPassword) {
-      toast.error('Passwords do not match');
+      setConfirmTouched(true);
+      confirmRef.current?.focus();
       return;
     }
     if (form.role === 'recruiter' && !form.company.name.trim()) {
-      toast.error('Company name is required for recruiters');
+      setError('Company name is required for recruiters.');
       return;
     }
 
+    setSubmitting(true);
     const result = await register(form);
+    setSubmitting(false);
     if (result.success) {
-      toast.success('Account created successfully!');
+      toast.success('Account created');
       navigate('/dashboard');
     } else {
-      toast.error(result.message);
+      setError(result.message);
     }
   };
 
   return (
-    <div className="min-h-screen flex relative overflow-hidden">
-      {/* Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-surface-950 via-primary-950/30 to-surface-950" />
-      <div className="absolute top-20 right-10 w-96 h-96 bg-accent-500/10 rounded-full blur-3xl animate-float" />
-      <div className="absolute bottom-0 left-0 w-72 h-72 bg-primary-500/15 rounded-full blur-3xl" />
+    <AuthLayout
+      title="Create your account"
+      subtitle={
+        <>
+          Already have one?{' '}
+          <Link to="/login" className="link">
+            Log in
+          </Link>
+        </>
+      }
+    >
+      <div className="card p-6 sm:p-8">
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {error && (
+            <div role="alert" className="alert-danger">
+              <ExclamationCircleIcon aria-hidden="true" className="h-5 w-5 flex-shrink-0" />
+              <p>{error}</p>
+            </div>
+          )}
 
-      <div className="relative w-full max-w-md mx-auto flex flex-col items-center justify-center px-6 py-12">
-        {/* Logo */}
-        <Link to="/" className="flex items-center gap-2 mb-8">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center shadow-glow">
-            <BriefcaseIcon className="h-5 w-5 text-white" />
+          <fieldset>
+            <legend className="label">I&apos;m joining to</legend>
+            <div className="grid grid-cols-2 gap-3">
+              {ROLES.map(({ value, label, description, icon: Icon }) => {
+                const selected = form.role === value;
+                return (
+                  <label
+                    key={value}
+                    className={`relative flex cursor-pointer flex-col gap-1.5 rounded-xl border p-4 transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring ${
+                      selected ? 'border-primary bg-primary-soft/60' : 'border-border-strong hover:border-input'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="role"
+                      value={value}
+                      checked={selected}
+                      onChange={() => setForm({ ...form, role: value })}
+                      className="sr-only"
+                    />
+                    <Icon aria-hidden="true" className={`h-5 w-5 ${selected ? 'text-primary-text' : 'text-muted-foreground'}`} />
+                    <span className="mt-1 text-sm font-semibold text-foreground">{label}</span>
+                    <span className="text-xs leading-snug text-muted-foreground">{description}</span>
+                    {selected && (
+                      <CheckCircleIcon aria-hidden="true" className="absolute right-3 top-3 h-5 w-5 text-primary-text" />
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+
+          <div>
+            <label htmlFor="register-name" className="label">
+              Full name
+            </label>
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              className="input"
+              autoComplete="name"
+              required
+              id="register-name"
+            />
           </div>
-          <span className="text-2xl font-bold gradient-text">Skill Sphere</span>
-        </Link>
 
-        <div className="w-full glass-card p-8 animate-scale-in">
-          <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-surface-100">Create Account</h1>
-            <p className="text-sm text-surface-400 mt-2">Join Skill Sphere today</p>
+          <div>
+            <label htmlFor="register-email" className="label">
+              Email
+            </label>
+            <input
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              className="input"
+              placeholder="you@example.com"
+              autoComplete="email"
+              required
+              id="register-email"
+            />
           </div>
 
-          {/* Role Selector */}
-          <div className="flex gap-3 mb-6">
-            {[
-              { value: 'candidate', label: 'Candidate', icon: UserIcon },
-              { value: 'recruiter', label: 'Recruiter', icon: BuildingOffice2Icon },
-            ].map(({ value, label, icon: Icon }) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setForm({ ...form, role: value })}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 transition-all ${
-                  form.role === value
-                    ? 'border-primary-500 bg-primary-500/10 text-primary-400'
-                    : 'border-surface-600/50 text-surface-400 hover:border-surface-500'
-                }`}
-              >
-                <Icon className="h-5 w-5" />
-                <span className="text-sm font-medium">{label}</span>
-              </button>
-            ))}
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
+          {form.role === 'recruiter' && (
             <div>
-              <label className="block text-sm font-medium text-surface-300 mb-1.5">Full Name</label>
+              <label htmlFor="register-company" className="label">
+                Company name
+              </label>
               <input
                 type="text"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                value={form.company.name}
+                onChange={(e) => setForm({ ...form, company: { ...form.company, name: e.target.value } })}
                 className="input"
-                placeholder="John Doe"
+                autoComplete="organization"
                 required
-                id="register-name"
+                id="register-company"
               />
             </div>
+          )}
 
-            <div>
-              <label className="block text-sm font-medium text-surface-300 mb-1.5">Email</label>
+          <div>
+            <label htmlFor="register-password" className="label">
+              Password
+            </label>
+            <div className="relative">
               <input
-                type="email"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="input"
-                placeholder="you@example.com"
+                type={showPassword ? 'text' : 'password'}
+                value={form.password}
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                className="input pr-12"
+                autoComplete="new-password"
+                aria-describedby="register-password-hint"
                 required
-                id="register-email"
+                minLength={6}
+                id="register-password"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="btn-ghost btn-icon absolute right-1 top-1/2 h-9 w-9 -translate-y-1/2"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-controls="register-password"
+              >
+                {showPassword ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+              </button>
             </div>
+            <p id="register-password-hint" className="hint">
+              At least 6 characters.
+            </p>
+          </div>
 
-            {form.role === 'recruiter' && (
-              <div className="animate-slide-down">
-                <label className="block text-sm font-medium text-surface-300 mb-1.5">Company Name</label>
-                <input
-                  type="text"
-                  value={form.company.name}
-                  onChange={(e) => setForm({ ...form, company: { ...form.company, name: e.target.value } })}
-                  className="input"
-                  placeholder="Acme Corp"
-                  required
-                  id="register-company"
-                />
-              </div>
+          <div>
+            <label htmlFor="register-confirm-password" className="label">
+              Confirm password
+            </label>
+            <input
+              ref={confirmRef}
+              type="password"
+              value={form.confirmPassword}
+              onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
+              onBlur={() => setConfirmTouched(true)}
+              className="input"
+              autoComplete="new-password"
+              aria-invalid={showMismatch || undefined}
+              aria-describedby={showMismatch ? 'register-confirm-error' : undefined}
+              required
+              id="register-confirm-password"
+            />
+            {showMismatch && (
+              <p id="register-confirm-error" role="alert" className="field-error">
+                Passwords don&apos;t match.
+              </p>
             )}
+          </div>
 
-            <div>
-              <label className="block text-sm font-medium text-surface-300 mb-1.5">Password</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  className="input pr-12"
-                  placeholder="Min 6 characters"
-                  required
-                  minLength={6}
-                  id="register-password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-400 hover:text-surface-200"
-                >
-                  {showPassword ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-surface-300 mb-1.5">Confirm Password</label>
-              <input
-                type="password"
-                value={form.confirmPassword}
-                onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
-                className="input"
-                placeholder="••••••••"
-                required
-                id="register-confirm-password"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="btn-primary w-full py-3"
-              id="register-submit"
-            >
-              {isLoading ? (
-                <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                'Create Account'
-              )}
-            </button>
-          </form>
-
-          <p className="text-sm text-surface-400 text-center mt-6">
-            Already have an account?{' '}
-            <Link to="/login" className="text-primary-400 hover:text-primary-300 font-medium">
-              Sign in
-            </Link>
-          </p>
-        </div>
+          <button type="submit" disabled={submitting} className="btn-primary w-full" id="register-submit">
+            {submitting && <ButtonSpinner />}
+            {submitting ? 'Creating account…' : 'Create account'}
+          </button>
+        </form>
       </div>
-    </div>
+    </AuthLayout>
   );
 };
 

@@ -2,22 +2,45 @@ import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeftIcon,
-  BuildingOffice2Icon,
   MapPinIcon,
   CalendarDaysIcon,
   EnvelopeIcon,
   PhoneIcon,
   CodeBracketIcon,
   GlobeAltIcon,
-  LinkIcon,
+  ArrowTopRightOnSquareIcon,
+  BriefcaseIcon,
 } from '@heroicons/react/24/outline';
 import PageLayout from '../../components/layout/PageLayout';
 import StatusBadge from '../../components/applications/StatusBadge';
+import StatusPipeline from '../../components/applications/StatusPipeline';
+import Avatar from '../../components/common/Avatar';
+import ScoreMeter from '../../components/common/ScoreMeter';
 import { PageLoader } from '../../components/common/LoadingSpinner';
 import { useAuth } from '../../context/AuthContext';
 import applicationsApi from '../../api/applicationsApi';
-import { formatDate, getJobTypeLabel, getExperienceLabel, getLocationTypeLabel, formatSalary } from '../../utils/helpers';
+import {
+  formatDate,
+  getJobTypeLabel,
+  getExperienceLabel,
+  getLocationTypeLabel,
+  formatSalary,
+  getStatusLabel,
+} from '../../utils/helpers';
 import toast from 'react-hot-toast';
+
+const ExternalLink = ({ href, icon: Icon, children }) => (
+  <a
+    href={href}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary-text underline-offset-4 hover:underline"
+  >
+    <Icon aria-hidden="true" className="h-4 w-4" />
+    {children}
+    <span className="sr-only">(opens in a new tab)</span>
+  </a>
+);
 
 const ApplicationDetailPage = () => {
   const { id } = useParams();
@@ -48,272 +71,282 @@ const ApplicationDetailPage = () => {
   const candidate = application.candidate;
   const assessment = application.assessment;
   const isRecruiter = user?.role === 'recruiter';
+  const companyName = job?.recruiter?.company?.name || job?.recruiter?.name || 'Company';
 
   return (
     <PageLayout>
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 page-enter">
-        {/* Back */}
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
         <Link
           to={isRecruiter ? `/jobs/${job?._id}/applications` : '/applications'}
-          className="inline-flex items-center gap-1 text-sm text-surface-400 hover:text-surface-200 mb-6 transition-colors"
+          className="inline-flex items-center gap-1.5 rounded text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
-          <ArrowLeftIcon className="h-4 w-4" />
-          {isRecruiter ? 'Back to Applications' : 'My Applications'}
+          <ArrowLeftIcon aria-hidden="true" className="h-4 w-4" />
+          {isRecruiter ? 'All applicants' : 'My applications'}
         </Link>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Header */}
-            <div className="glass-card p-6">
-              <div className="flex items-start justify-between gap-4 mb-4">
-                <div>
-                  <h1 className="text-2xl font-bold text-surface-100">
-                    {job?.title || 'Job Position'}
-                  </h1>
-                  <div className="flex items-center gap-2 mt-1 text-surface-400">
-                    <BuildingOffice2Icon className="h-4 w-4" />
-                    <span>{job?.recruiter?.company?.name || job?.recruiter?.name || 'Company'}</span>
-                  </div>
-                </div>
-                <StatusBadge status={application.status} />
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+        <header className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex min-w-0 items-start gap-4">
+            <Avatar name={companyName} square size="xl" className="hidden sm:inline-flex" />
+            <div className="min-w-0">
+              <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">{job?.title || 'Job position'}</h1>
+              <p className="mt-1 text-base text-muted-foreground">{companyName}</p>
+              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                 {job?.location && (
-                  <span className="flex items-center gap-1.5 text-surface-300">
-                    <MapPinIcon className="h-4 w-4 text-primary-400" />
+                  <span className="flex items-center gap-1.5">
+                    <MapPinIcon aria-hidden="true" className="h-4 w-4 text-subtle-foreground" />
                     {job.location}
                   </span>
                 )}
-                <span className="flex items-center gap-1.5 text-surface-300">
-                  <CalendarDaysIcon className="h-4 w-4 text-primary-400" />
+                <span className="flex items-center gap-1.5">
+                  <CalendarDaysIcon aria-hidden="true" className="h-4 w-4 text-subtle-foreground" />
                   Applied {formatDate(application.createdAt)}
                 </span>
-                {job?.jobType && (
-                  <span className="text-surface-300">{getJobTypeLabel(job.jobType)}</span>
-                )}
-                {job?.locationType && (
-                  <span className="text-surface-300">{getLocationTypeLabel(job.locationType)}</span>
-                )}
               </div>
             </div>
+          </div>
+          <StatusBadge status={application.status} className="self-start" />
+        </header>
 
-            {/* Cover Letter */}
-            {application.coverLetter && (
-              <div className="glass-card p-6">
-                <h2 className="text-lg font-bold text-surface-100 mb-3">Cover Letter</h2>
-                <p className="text-surface-300 text-sm leading-relaxed whitespace-pre-wrap">
-                  {application.coverLetter}
-                </p>
-              </div>
-            )}
+        <section className="card mt-8 p-5 sm:p-6" aria-labelledby="progress-title">
+          <h2 id="progress-title" className="sr-only">
+            Progress
+          </h2>
+          <StatusPipeline status={application.status} history={application.statusHistory} />
+        </section>
 
-            {/* Project Showcase */}
-            {application.projectShowcase?.length > 0 && (
-              <div className="glass-card p-6">
-                <h2 className="text-lg font-bold text-surface-100 mb-4">Project Showcase</h2>
-                <div className="space-y-4">
-                  {application.projectShowcase.map((project, i) => (
-                    <div key={i} className="p-4 bg-surface-800/30 rounded-xl border border-surface-700/30">
-                      <h3 className="font-semibold text-surface-200 mb-1">{project.title}</h3>
-                      {project.description && (
-                        <p className="text-sm text-surface-400 mb-2">{project.description}</p>
-                      )}
-                      {project.techStack?.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mb-2">
-                          {project.techStack.map((t) => (
-                            <span key={t} className="px-2 py-0.5 bg-surface-700/50 text-surface-300 text-xs rounded-md">{t}</span>
-                          ))}
-                        </div>
-                      )}
-                      {project.url && (
-                        <a href={project.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm text-primary-400 hover:text-primary-300">
-                          <LinkIcon className="h-3.5 w-3.5" />
-                          View Project
-                        </a>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Assessment Results */}
+        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
+          <div className="space-y-6 lg:col-span-2">
             {assessment && assessment.scores?.length > 0 && (
-              <div className="glass-card p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-bold text-surface-100">Assessment Results</h2>
+              <section className="card p-6 sm:p-8" aria-labelledby="assessment-title">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 id="assessment-title" className="section-title">
+                      Assessment
+                    </h2>
+                    <p className="mt-1 text-sm text-muted-foreground">Scored against the rubric for this role.</p>
+                  </div>
                   {assessment.percentageScore > 0 && (
-                    <span className="text-2xl font-bold text-primary-400">
-                      {assessment.percentageScore}%
-                    </span>
+                    <div className="text-right">
+                      <p className="text-4xl font-bold tracking-tight text-foreground">{assessment.percentageScore}%</p>
+                      <p className="text-xs text-muted-foreground">Overall score</p>
+                    </div>
                   )}
                 </div>
 
-                {/* Overall progress bar */}
-                {assessment.percentageScore > 0 && (
-                  <div className="mb-6">
-                    <div className="w-full bg-surface-800 rounded-full h-3 overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-primary-500 to-accent-500 transition-all"
-                        style={{ width: `${assessment.percentageScore}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Individual scores */}
-                <div className="space-y-3">
+                <ul className="mt-6 space-y-5">
                   {assessment.scores.map((s, i) => (
-                    <div key={i} className="p-3 bg-surface-800/30 rounded-xl">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium text-surface-200">{s.criteria}</span>
-                        <span className="text-sm font-bold text-primary-400">{s.score}/{s.maxScore}</span>
+                    <li key={i}>
+                      <div className="mb-2 flex items-baseline justify-between gap-4">
+                        <span className="text-sm font-medium text-foreground">{s.criteria}</span>
+                        <span className="text-sm font-semibold tabular-nums text-foreground">
+                          {s.score}/{s.maxScore}
+                        </span>
                       </div>
-                      {s.feedback && (
-                        <p className="text-xs text-surface-400 mt-1">{s.feedback}</p>
-                      )}
-                      <div className="mt-2 bg-surface-800 rounded-full h-1.5 overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-primary-500 transition-all"
-                          style={{ width: `${(s.score / s.maxScore) * 100}%` }}
-                        />
-                      </div>
-                    </div>
+                      <ScoreMeter value={s.score} max={s.maxScore} decorative />
+                      {s.feedback && <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{s.feedback}</p>}
+                    </li>
                   ))}
-                </div>
+                </ul>
 
                 {assessment.overallFeedback && (
-                  <div className="mt-4 pt-4 border-t border-surface-700/30">
-                    <p className="text-xs font-medium text-surface-400 mb-1">Overall Feedback</p>
-                    <p className="text-sm text-surface-300">{assessment.overallFeedback}</p>
+                  <div className="mt-6 rounded-lg bg-muted/60 p-4">
+                    <p className="text-xs font-semibold text-muted-foreground">Overall feedback</p>
+                    <p className="mt-1 text-sm leading-relaxed text-foreground">{assessment.overallFeedback}</p>
                   </div>
                 )}
+              </section>
+            )}
+
+            {application.coverLetter && (
+              <section className="card p-6 sm:p-8" aria-labelledby="cover-letter-title">
+                <h2 id="cover-letter-title" className="section-title">
+                  Cover letter
+                </h2>
+                <p className="mt-3 max-w-prose whitespace-pre-wrap text-[0.9375rem] leading-7 text-foreground/90">
+                  {application.coverLetter}
+                </p>
+              </section>
+            )}
+
+            {application.projectShowcase?.length > 0 && (
+              <section className="card p-6 sm:p-8" aria-labelledby="projects-title">
+                <h2 id="projects-title" className="section-title">
+                  Projects
+                </h2>
+                <ul className="mt-4 space-y-3">
+                  {application.projectShowcase.map((project, i) => (
+                    <li key={i} className="rounded-xl border border-border p-4">
+                      <h3 className="font-semibold text-foreground">{project.title}</h3>
+                      {project.description && (
+                        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{project.description}</p>
+                      )}
+                      {project.techStack?.length > 0 && (
+                        <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Tech stack">
+                          {project.techStack.map((t) => (
+                            <li key={t} className="chip">
+                              {t}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {project.url && (
+                        <div className="mt-3">
+                          <ExternalLink href={project.url} icon={ArrowTopRightOnSquareIcon}>
+                            View project
+                          </ExternalLink>
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {!application.coverLetter && !application.projectShowcase?.length && !(assessment?.scores?.length > 0) && (
+              <div className="card p-6 text-sm text-muted-foreground sm:p-8">
+                This application was submitted without a cover letter or projects.
               </div>
             )}
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Candidate Info (visible to recruiters) */}
+          <aside className="space-y-6">
             {isRecruiter && candidate && (
-              <div className="glass-card p-6">
-                <h3 className="text-sm font-bold text-surface-100 mb-3">Candidate Info</h3>
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center text-white font-bold">
-                    {candidate.name?.[0]?.toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="font-semibold text-surface-200">{candidate.name}</p>
+              <section className="card p-6" aria-labelledby="candidate-title">
+                <h2 id="candidate-title" className="section-title">
+                  Candidate
+                </h2>
+                <div className="mt-4 flex items-center gap-3">
+                  <Avatar name={candidate.name} size="lg" />
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-foreground">{candidate.name}</p>
                     {candidate.experience != null && (
-                      <p className="text-xs text-surface-400">{candidate.experience} years exp.</p>
+                      <p className="text-sm text-muted-foreground">
+                        {candidate.experience} {candidate.experience === 1 ? 'year' : 'years'} of experience
+                      </p>
                     )}
                   </div>
                 </div>
 
-                <div className="space-y-2 text-sm">
-                  <p className="flex items-center gap-2 text-surface-400">
-                    <EnvelopeIcon className="h-4 w-4" />{candidate.email}
-                  </p>
+                <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
+                  <li className="flex items-center gap-2 break-all">
+                    <EnvelopeIcon aria-hidden="true" className="h-4 w-4 flex-shrink-0 text-subtle-foreground" />
+                    <a href={`mailto:${candidate.email}`} className="hover:text-foreground hover:underline">
+                      {candidate.email}
+                    </a>
+                  </li>
                   {candidate.phone && (
-                    <p className="flex items-center gap-2 text-surface-400">
-                      <PhoneIcon className="h-4 w-4" />{candidate.phone}
-                    </p>
+                    <li className="flex items-center gap-2">
+                      <PhoneIcon aria-hidden="true" className="h-4 w-4 flex-shrink-0 text-subtle-foreground" />
+                      {candidate.phone}
+                    </li>
                   )}
                   {candidate.location && (
-                    <p className="flex items-center gap-2 text-surface-400">
-                      <MapPinIcon className="h-4 w-4" />{candidate.location}
-                    </p>
+                    <li className="flex items-center gap-2">
+                      <MapPinIcon aria-hidden="true" className="h-4 w-4 flex-shrink-0 text-subtle-foreground" />
+                      {candidate.location}
+                    </li>
                   )}
-                </div>
+                </ul>
 
                 {candidate.skills?.length > 0 && (
-                  <div className="mt-4">
-                    <p className="text-xs font-medium text-surface-400 mb-2">Skills</p>
-                    <div className="flex flex-wrap gap-1">
+                  <div className="mt-5">
+                    <p className="text-xs font-semibold text-muted-foreground">Skills</p>
+                    <ul className="mt-2 flex flex-wrap gap-1.5">
                       {candidate.skills.map((s) => (
-                        <span key={s} className="px-2 py-0.5 bg-primary-500/10 text-primary-400 text-xs rounded-md border border-primary-500/20">{s}</span>
+                        <li key={s} className="chip">
+                          {s}
+                        </li>
                       ))}
-                    </div>
+                    </ul>
                   </div>
                 )}
 
-                {candidate.portfolio && (
-                  <div className="mt-4 space-y-1">
+                {(candidate.portfolio?.github || candidate.portfolio?.linkedin) && (
+                  <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2">
                     {candidate.portfolio.github && (
-                      <a href={candidate.portfolio.github} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs text-primary-400 hover:text-primary-300">
-                        <CodeBracketIcon className="h-3.5 w-3.5" />GitHub
-                      </a>
+                      <ExternalLink href={candidate.portfolio.github} icon={CodeBracketIcon}>
+                        GitHub
+                      </ExternalLink>
                     )}
                     {candidate.portfolio.linkedin && (
-                      <a href={candidate.portfolio.linkedin} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs text-primary-400 hover:text-primary-300">
-                        <GlobeAltIcon className="h-3.5 w-3.5" />LinkedIn
-                      </a>
+                      <ExternalLink href={candidate.portfolio.linkedin} icon={GlobeAltIcon}>
+                        LinkedIn
+                      </ExternalLink>
                     )}
                   </div>
                 )}
-              </div>
+              </section>
             )}
 
-            {/* Job Details */}
-            <div className="glass-card p-6">
-              <h3 className="text-sm font-bold text-surface-100 mb-3">Job Details</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-surface-400">Salary</span>
-                  <span className="text-surface-200">{formatSalary(job?.salary)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-surface-400">Experience</span>
-                  <span className="text-surface-200">{getExperienceLabel(job?.experienceLevel)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-surface-400">Type</span>
-                  <span className="text-surface-200">{getJobTypeLabel(job?.jobType)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-surface-400">Location</span>
-                  <span className="text-surface-200">{getLocationTypeLabel(job?.locationType)}</span>
-                </div>
-              </div>
+            <section className="card p-6" aria-labelledby="job-details-title">
+              <h2 id="job-details-title" className="section-title">
+                Job details
+              </h2>
+              <dl className="mt-4 space-y-3 text-sm">
+                {[
+                  ['Salary', formatSalary(job?.salary)],
+                  ['Experience', getExperienceLabel(job?.experienceLevel)],
+                  ['Job type', getJobTypeLabel(job?.jobType)],
+                  ['Work style', getLocationTypeLabel(job?.locationType)],
+                ].map(([term, value]) => (
+                  <div key={term} className="flex justify-between gap-4">
+                    <dt className="text-muted-foreground">{term}</dt>
+                    <dd className="text-right font-medium text-foreground">{value || 'Not listed'}</dd>
+                  </div>
+                ))}
+              </dl>
 
               {job?.techStack?.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-surface-700/30">
-                  <p className="text-xs font-medium text-surface-400 mb-2">Tech Stack</p>
-                  <div className="flex flex-wrap gap-1">
+                <div className="mt-5 border-t border-border pt-4">
+                  <p className="text-xs font-semibold text-muted-foreground">Tech stack</p>
+                  <ul className="mt-2 flex flex-wrap gap-1.5">
                     {job.techStack.map((t) => (
-                      <span key={t} className="px-2 py-0.5 bg-surface-700/50 text-surface-300 text-xs rounded-md">{t}</span>
+                      <li key={t} className="chip">
+                        {t}
+                      </li>
                     ))}
-                  </div>
+                  </ul>
                 </div>
               )}
 
-              <Link to={`/jobs/${job?._id}`} className="block mt-4 text-sm text-primary-400 hover:text-primary-300 text-center">
-                View Full Job Posting →
+              <Link to={`/jobs/${job?._id}`} className="btn-secondary btn-sm mt-5 w-full">
+                <BriefcaseIcon aria-hidden="true" className="h-4 w-4" />
+                View job posting
               </Link>
-            </div>
+            </section>
 
-            {/* Status Timeline */}
             {application.statusHistory?.length > 0 && (
-              <div className="glass-card p-6">
-                <h3 className="text-sm font-bold text-surface-100 mb-3">Status Timeline</h3>
-                <div className="space-y-3">
-                  {application.statusHistory.map((entry, i) => (
-                    <div key={i} className="flex items-start gap-3">
-                      <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
-                        i === application.statusHistory.length - 1 ? 'bg-primary-400' : 'bg-surface-500'
-                      }`} />
-                      <div>
-                        <p className="text-sm font-medium text-surface-200 capitalize">{entry.status}</p>
-                        <p className="text-[10px] text-surface-500">{formatDate(entry.changedAt)}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <section className="card p-6" aria-labelledby="history-title">
+                <h2 id="history-title" className="section-title">
+                  History
+                </h2>
+                <ol className="mt-4">
+                  {application.statusHistory.map((entry, i) => {
+                    const isLatest = i === application.statusHistory.length - 1;
+                    return (
+                      <li key={i} className="relative flex gap-3 pb-4 last:pb-0">
+                        {!isLatest && (
+                          <span aria-hidden="true" className="absolute bottom-0 left-[5px] top-4 w-px bg-border-strong" />
+                        )}
+                        <span
+                          aria-hidden="true"
+                          className={`relative mt-1.5 h-[11px] w-[11px] flex-shrink-0 rounded-full border-2 ${
+                            isLatest ? 'border-primary bg-primary' : 'border-border-strong bg-card'
+                          }`}
+                        />
+                        <div>
+                          <p className="text-sm font-medium text-foreground">{getStatusLabel(entry.status)}</p>
+                          <p className="text-xs text-muted-foreground">
+                            <time dateTime={entry.changedAt}>{formatDate(entry.changedAt)}</time>
+                          </p>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ol>
+              </section>
             )}
-          </div>
+          </aside>
         </div>
       </div>
     </PageLayout>

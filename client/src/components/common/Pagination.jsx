@@ -29,35 +29,38 @@ const Pagination = ({ pagination, onPageChange }) => {
   };
 
   return (
-    <div className="flex items-center justify-between py-4">
-      <p className="text-sm text-surface-400">
-        Showing page <span className="font-medium text-surface-200">{page}</span> of{' '}
-        <span className="font-medium text-surface-200">{totalPages}</span>
-        <span className="hidden sm:inline"> ({total} total results)</span>
+    <nav aria-label="Pagination" className="flex flex-col-reverse items-center justify-between gap-4 pt-6 sm:flex-row">
+      <p className="text-sm text-muted-foreground">
+        Page <span className="font-semibold text-foreground">{page}</span> of{' '}
+        <span className="font-semibold text-foreground">{totalPages}</span>
+        <span className="hidden sm:inline"> ({total} results)</span>
       </p>
 
       <div className="flex items-center gap-1">
         <button
+          type="button"
           onClick={() => onPageChange(page - 1)}
           disabled={!hasPrev}
-          className="p-2 rounded-lg hover:bg-surface-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          className="btn-ghost btn-icon"
+          aria-label="Previous page"
         >
-          <ChevronLeftIcon className="h-4 w-4" />
+          <ChevronLeftIcon className="h-5 w-5" />
         </button>
 
         {getPageNumbers().map((p, i) =>
           p === '...' ? (
-            <span key={`ellipsis-${i}`} className="px-2 text-surface-500">
+            <span key={`ellipsis-${i}`} aria-hidden="true" className="px-1.5 text-muted-foreground">
               …
             </span>
           ) : (
             <button
               key={p}
+              type="button"
               onClick={() => onPageChange(p)}
-              className={`min-w-[36px] h-9 rounded-lg text-sm font-medium transition-all ${
-                p === page
-                  ? 'bg-primary-600 text-white shadow-glow'
-                  : 'hover:bg-surface-700 text-surface-300'
+              aria-label={`Page ${p}`}
+              aria-current={p === page ? 'page' : undefined}
+              className={`btn btn-icon tabular-nums ${
+                p === page ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               }`}
             >
               {p}
@@ -66,14 +69,16 @@ const Pagination = ({ pagination, onPageChange }) => {
         )}
 
         <button
+          type="button"
           onClick={() => onPageChange(page + 1)}
           disabled={!hasNext}
-          className="p-2 rounded-lg hover:bg-surface-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          className="btn-ghost btn-icon"
+          aria-label="Next page"
         >
-          <ChevronRightIcon className="h-4 w-4" />
+          <ChevronRightIcon className="h-5 w-5" />
         </button>
       </div>
-    </div>
+    </nav>
   );
 };
 

@@ -3,44 +3,53 @@ import {
   PlusCircleIcon,
   MagnifyingGlassIcon,
   DocumentTextIcon,
-  UserGroupIcon,
+  UserCircleIcon,
+  ChevronRightIcon,
 } from '@heroicons/react/24/outline';
 
 const QuickActions = ({ role }) => {
   const candidateActions = [
-    { name: 'Browse Jobs', icon: MagnifyingGlassIcon, path: '/jobs', color: 'from-primary-500 to-primary-600' },
-    { name: 'My Applications', icon: DocumentTextIcon, path: '/applications', color: 'from-accent-500 to-accent-600' },
-    { name: 'Edit Profile', icon: UserGroupIcon, path: '/profile', color: 'from-amber-500 to-amber-600' },
+    { name: 'Browse jobs', icon: MagnifyingGlassIcon, path: '/jobs' },
+    { name: 'My applications', icon: DocumentTextIcon, path: '/applications' },
+    { name: 'Edit profile', icon: UserCircleIcon, path: '/profile' },
   ];
 
   const recruiterActions = [
-    { name: 'Post New Job', icon: PlusCircleIcon, path: '/jobs/new', color: 'from-primary-500 to-primary-600' },
-    { name: 'My Jobs', icon: DocumentTextIcon, path: '/dashboard', color: 'from-accent-500 to-accent-600' },
-    { name: 'Edit Profile', icon: UserGroupIcon, path: '/profile', color: 'from-amber-500 to-amber-600' },
+    { name: 'Post a new job', icon: PlusCircleIcon, path: '/jobs/new' },
+    { name: 'Browse the job board', icon: MagnifyingGlassIcon, path: '/jobs' },
+    { name: 'Edit company profile', icon: UserCircleIcon, path: '/profile' },
   ];
 
   const actions = role === 'recruiter' ? recruiterActions : candidateActions;
 
   return (
-    <div className="glass-card p-6">
-      <h3 className="text-lg font-bold text-surface-100 mb-4">Quick Actions</h3>
-      <div className="grid grid-cols-1 gap-3">
+    <section className="card p-5" aria-labelledby="quick-actions-title">
+      <h2 id="quick-actions-title" className="section-title">
+        Quick actions
+      </h2>
+      <ul className="-mx-2 mt-3">
         {actions.map((action) => (
-          <Link
-            key={action.name}
-            to={action.path}
-            className="flex items-center gap-3 p-3 rounded-xl bg-surface-800/30 hover:bg-surface-700/50 transition-all group"
-          >
-            <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${action.color} flex items-center justify-center shadow-md group-hover:shadow-lg transition-shadow`}>
-              <action.icon className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-sm font-medium text-surface-200 group-hover:text-surface-100">
-              {action.name}
-            </span>
-          </Link>
+          <li key={action.name}>
+            <Link
+              to={action.path}
+              className="group flex items-center gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-muted"
+            >
+              <span
+                aria-hidden="true"
+                className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-foreground"
+              >
+                <action.icon className="h-5 w-5" />
+              </span>
+              <span className="flex-1 text-sm font-medium text-foreground">{action.name}</span>
+              <ChevronRightIcon
+                aria-hidden="true"
+                className="h-4 w-4 text-subtle-foreground transition-transform duration-150 group-hover:translate-x-0.5"
+              />
+            </Link>
+          </li>
         ))}
-      </div>
-    </div>
+      </ul>
+    </section>
   );
 };
 

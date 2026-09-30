@@ -75,8 +75,9 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, []);
 
+  // login/register leave `isLoading` alone: it gates the route guards, and toggling it
+  // would unmount the form mid-submit. The pages track their own submitting state.
   const login = useCallback(async (credentials) => {
-    dispatch({ type: 'SET_LOADING', payload: true });
     try {
       const { data } = await authApi.login(credentials);
       const { user, accessToken, refreshToken } = data.data;
@@ -93,7 +94,6 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const register = useCallback(async (userData) => {
-    dispatch({ type: 'SET_LOADING', payload: true });
     try {
       const { data } = await authApi.register(userData);
       const { user, accessToken, refreshToken } = data.data;

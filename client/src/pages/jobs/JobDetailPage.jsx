@@ -2,22 +2,28 @@ import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   MapPinIcon,
-  CurrencyRupeeIcon,
-  CalendarDaysIcon,
-  BuildingOffice2Icon,
-  ClockIcon,
+  BriefcaseIcon,
+  ChartBarIcon,
   UserGroupIcon,
-  CheckBadgeIcon,
+  CheckCircleIcon,
   ArrowLeftIcon,
+  ArrowTopRightOnSquareIcon,
+  ClipboardDocumentCheckIcon,
+  PencilSquareIcon,
+  PlusIcon,
 } from '@heroicons/react/24/outline';
 import PageLayout from '../../components/layout/PageLayout';
 import Modal from '../../components/common/Modal';
-import { PageLoader } from '../../components/common/LoadingSpinner';
+import Avatar from '../../components/common/Avatar';
+import { PageLoader, ButtonSpinner } from '../../components/common/LoadingSpinner';
+import { getWorkStyleIcon } from '../../components/jobs/jobMeta';
 import { useAuth } from '../../context/AuthContext';
 import jobsApi from '../../api/jobsApi';
 import applicationsApi from '../../api/applicationsApi';
 import { formatDate, formatSalary, getLocationTypeLabel, getJobTypeLabel, getExperienceLabel } from '../../utils/helpers';
 import toast from 'react-hot-toast';
+
+const emptyProject = () => ({ title: '', description: '', techStack: [], url: '' });
 
 const JobDetailPage = () => {
   const { id } = useParams();
@@ -28,7 +34,7 @@ const JobDetailPage = () => {
   const [applyOpen, setApplyOpen] = useState(false);
   const [applying, setApplying] = useState(false);
   const [coverLetter, setCoverLetter] = useState('');
-  const [projectShowcase, setProjectShowcase] = useState([{ title: '', description: '', techStack: [], url: '' }]);
+  const [projectShowcase, setProjectShowcase] = useState([emptyProject()]);
 
   useEffect(() => {
     const fetchJob = async () => {
@@ -45,7 +51,12 @@ const JobDetailPage = () => {
     fetchJob();
   }, [id, navigate]);
 
-  const handleApply = async () => {
+  const updateProject = (index, field, value) => {
+    setProjectShowcase((prev) => prev.map((p, i) => (i === index ? { ...p, [field]: value } : p)));
+  };
+
+  const handleApply = async (e) => {
+    e.preventDefault();
     if (!isAuthenticated) {
       navigate('/login');
       return;
@@ -58,7 +69,7 @@ const JobDetailPage = () => {
         coverLetter,
         projectShowcase: filtered,
       });
-      toast.success('Application submitted!');
+      toast.success('Application submitted');
       setApplyOpen(false);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to apply');
@@ -71,256 +82,297 @@ const JobDetailPage = () => {
   if (!job) return null;
 
   const recruiter = job.recruiter;
+  const companyName = recruiter?.company?.name || recruiter?.name || 'Company';
   const isRecruiter = user?.role === 'recruiter';
   const isOwner = user?._id === recruiter?._id || user?.id === recruiter?._id;
+  const applicants = job.applicationsCount || 0;
+  const WorkStyleIcon = getWorkStyleIcon(job.locationType);
 
   return (
     <PageLayout>
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 page-enter">
-        {/* Back */}
-        <Link to="/jobs" className="inline-flex items-center gap-1 text-sm text-surface-400 hover:text-surface-200 mb-6 transition-colors">
-          <ArrowLeftIcon className="h-4 w-4" />
-          Back to Jobs
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+        <Link
+          to="/jobs"
+          className="inline-flex items-center gap-1.5 rounded text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeftIcon aria-hidden="true" className="h-4 w-4" />
+          All jobs
         </Link>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Header */}
-            <div className="glass-card p-6">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h1 className="text-2xl font-bold text-surface-100">{job.title}</h1>
-                  <div className="flex items-center gap-2 mt-2 text-surface-400">
-                    <BuildingOffice2Icon className="h-4 w-4" />
-                    <span>{recruiter?.company?.name || recruiter?.name}</span>
-                  </div>
-                </div>
-                <span className="px-3 py-1 bg-primary-500/10 text-primary-400 text-sm font-semibold rounded-full border border-primary-500/20">
-                  {getJobTypeLabel(job.jobType)}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
-                <div className="flex items-center gap-2 text-sm text-surface-300">
-                  <CurrencyRupeeIcon className="h-4 w-4 text-primary-400" />
-                  {formatSalary(job.salary)}
-                </div>
-                <div className="flex items-center gap-2 text-sm text-surface-300">
-                  <MapPinIcon className="h-4 w-4 text-primary-400" />
-                  {job.location || 'N/A'}
-                </div>
-                <div className="flex items-center gap-2 text-sm text-surface-300">
-                  <ClockIcon className="h-4 w-4 text-primary-400" />
-                  {getExperienceLabel(job.experienceLevel)}
-                </div>
-                <div className="flex items-center gap-2 text-sm text-surface-300">
-                  <UserGroupIcon className="h-4 w-4 text-primary-400" />
-                  {job.applicationsCount || 0} applied
-                </div>
-              </div>
-            </div>
-
-            {/* Tech Stack */}
-            {job.techStack?.length > 0 && (
-              <div className="glass-card p-6">
-                <h2 className="text-lg font-bold text-surface-100 mb-3">Tech Stack</h2>
-                <div className="flex flex-wrap gap-2">
-                  {job.techStack.map((tech) => (
-                    <span key={tech} className="px-3 py-1.5 bg-primary-500/10 text-primary-400 text-sm rounded-xl border border-primary-500/20 font-medium">
-                      {tech}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Description */}
-            <div className="glass-card p-6">
-              <h2 className="text-lg font-bold text-surface-100 mb-3">Description</h2>
-              <div className="text-surface-300 text-sm leading-relaxed whitespace-pre-wrap">
-                {job.description}
-              </div>
-            </div>
-
-            {/* Requirements */}
-            {job.requirements?.length > 0 && (
-              <div className="glass-card p-6">
-                <h2 className="text-lg font-bold text-surface-100 mb-3">Requirements</h2>
-                <ul className="space-y-2">
-                  {job.requirements.map((req, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-surface-300">
-                      <CheckBadgeIcon className="h-4 w-4 text-primary-400 mt-0.5 flex-shrink-0" />
-                      {req}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Responsibilities */}
-            {job.responsibilities?.length > 0 && (
-              <div className="glass-card p-6">
-                <h2 className="text-lg font-bold text-surface-100 mb-3">Responsibilities</h2>
-                <ul className="space-y-2">
-                  {job.responsibilities.map((r, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-surface-300">
-                      <span className="text-accent-400 mt-0.5">→</span>
-                      {r}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+        <header className="mt-6 flex flex-col gap-5 sm:flex-row sm:items-start">
+          <Avatar name={companyName} square size="xl" />
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">{job.title}</h1>
+            <p className="mt-1 text-base text-muted-foreground">{companyName}</p>
+            <ul className="mt-4 flex flex-wrap gap-2 text-sm">
+              {[
+                { icon: MapPinIcon, label: job.location || 'Location not listed' },
+                { icon: WorkStyleIcon, label: getLocationTypeLabel(job.locationType) },
+                { icon: BriefcaseIcon, label: getJobTypeLabel(job.jobType) },
+                { icon: ChartBarIcon, label: getExperienceLabel(job.experienceLevel) },
+              ].map(({ icon: Icon, label }, i) => (
+                <li
+                  key={i}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-foreground"
+                >
+                  <Icon aria-hidden="true" className="h-4 w-4 text-subtle-foreground" />
+                  {label}
+                </li>
+              ))}
+            </ul>
           </div>
+        </header>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Apply Card */}
-            <div className="glass-card p-6 sticky top-24">
+        <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
+          {/* Apply panel: first on mobile, right column on desktop */}
+          <aside className="order-first space-y-6 lg:order-last">
+            <div className="card p-6 lg:sticky lg:top-24">
+              <p className="text-sm text-muted-foreground">Salary</p>
+              <p className="mt-1 text-xl font-bold tracking-tight text-foreground">{formatSalary(job.salary)}</p>
+
               {isOwner ? (
-                <div className="space-y-3">
-                  <Link to={`/jobs/${job._id}/edit`} className="btn-primary w-full">
-                    Edit Job
+                <div className="mt-5 space-y-2.5">
+                  <Link to={`/jobs/${job._id}/applications`} className="btn-primary w-full">
+                    <UserGroupIcon aria-hidden="true" className="h-5 w-5" />
+                    Review applicants ({applicants})
                   </Link>
-                  <Link to={`/jobs/${job._id}/applications`} className="btn-secondary w-full">
-                    View Applications ({job.applicationsCount || 0})
+                  <Link to={`/jobs/${job._id}/edit`} className="btn-secondary w-full">
+                    <PencilSquareIcon aria-hidden="true" className="h-5 w-5" />
+                    Edit job
                   </Link>
                 </div>
               ) : !isRecruiter ? (
                 <>
                   <button
-                    onClick={() => isAuthenticated ? setApplyOpen(true) : navigate('/login')}
-                    className="btn-primary w-full py-3 text-base"
+                    type="button"
+                    onClick={() => (isAuthenticated ? setApplyOpen(true) : navigate('/login'))}
+                    className="btn-primary btn-lg mt-5 w-full"
                     id="apply-button"
                   >
-                    Apply Now
+                    {isAuthenticated ? 'Apply now' : 'Log in to apply'}
                   </button>
-                  <p className="text-xs text-surface-500 text-center mt-3">
+                  <p className="mt-3 text-center text-xs text-muted-foreground">
                     {job.applicationDeadline
-                      ? `Deadline: ${formatDate(job.applicationDeadline)}`
-                      : 'No deadline'}
+                      ? `Apply by ${formatDate(job.applicationDeadline)}`
+                      : 'No application deadline'}
                   </p>
                 </>
-              ) : null}
+              ) : (
+                <p className="mt-4 text-sm text-muted-foreground">Recruiter accounts can&apos;t apply to jobs.</p>
+              )}
 
-              {/* Job Meta */}
-              <div className="mt-6 pt-6 border-t border-surface-700/50 space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-surface-400">Location Type</span>
-                  <span className="text-surface-200">{getLocationTypeLabel(job.locationType)}</span>
+              <dl className="mt-6 space-y-3 border-t border-border pt-5 text-sm">
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">Applicants</dt>
+                  <dd className="font-medium text-foreground">{applicants}</dd>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-surface-400">Posted</span>
-                  <span className="text-surface-200">{formatDate(job.createdAt)}</span>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">Posted</dt>
+                  <dd className="font-medium text-foreground">{formatDate(job.createdAt)}</dd>
                 </div>
                 {job.assessment?.enabled && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-surface-400">Assessment</span>
-                    <span className="text-accent-400">✓ Required</span>
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-muted-foreground">Assessment</dt>
+                    <dd className="flex items-center gap-1.5 font-medium text-foreground">
+                      <ClipboardDocumentCheckIcon aria-hidden="true" className="h-4 w-4 text-iris" />
+                      Rubric scored
+                    </dd>
                   </div>
                 )}
-              </div>
+              </dl>
             </div>
 
-            {/* Company Info */}
             {recruiter?.company && (
-              <div className="glass-card p-6">
-                <h3 className="text-sm font-bold text-surface-100 mb-3">About the Company</h3>
-                <p className="text-lg font-semibold text-surface-200 mb-1">
-                  {recruiter.company.name}
-                </p>
+              <section className="card p-6" aria-labelledby="company-title">
+                <h2 id="company-title" className="section-title">
+                  About {recruiter.company.name}
+                </h2>
                 {recruiter.company.description && (
-                  <p className="text-sm text-surface-400 mb-3">{recruiter.company.description}</p>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{recruiter.company.description}</p>
                 )}
                 {recruiter.company.size && (
-                  <span className="text-xs text-surface-400 bg-surface-800 px-2 py-1 rounded">
+                  <p className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+                    <UserGroupIcon aria-hidden="true" className="h-4 w-4" />
                     {recruiter.company.size} employees
-                  </span>
+                  </p>
                 )}
-              </div>
+                {recruiter.company.website && (
+                  <a
+                    href={recruiter.company.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="link mt-3 inline-flex items-center gap-1 text-sm"
+                  >
+                    Visit website
+                    <ArrowTopRightOnSquareIcon aria-hidden="true" className="h-4 w-4" />
+                    <span className="sr-only">(opens in a new tab)</span>
+                  </a>
+                )}
+              </section>
             )}
-          </div>
+          </aside>
+
+          <article className="card lg:col-span-2">
+            <section className="p-6 sm:p-8" aria-labelledby="about-role-title">
+              <h2 id="about-role-title" className="section-title">
+                About the role
+              </h2>
+              <div className="mt-3 max-w-prose whitespace-pre-wrap text-[0.9375rem] leading-7 text-foreground/90">
+                {job.description}
+              </div>
+            </section>
+
+            {job.techStack?.length > 0 && (
+              <section className="border-t border-border p-6 sm:p-8" aria-labelledby="tech-stack-title">
+                <h2 id="tech-stack-title" className="section-title">
+                  Tech stack
+                </h2>
+                <ul className="mt-3 flex flex-wrap gap-2">
+                  {job.techStack.map((tech) => (
+                    <li key={tech} className="chip px-2.5 py-1 text-sm">
+                      {tech}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {job.requirements?.length > 0 && (
+              <section className="border-t border-border p-6 sm:p-8" aria-labelledby="requirements-title">
+                <h2 id="requirements-title" className="section-title">
+                  Requirements
+                </h2>
+                <ul className="mt-3 space-y-2.5">
+                  {job.requirements.map((req, i) => (
+                    <li key={i} className="flex gap-3 text-[0.9375rem] leading-6 text-foreground/90">
+                      <CheckCircleIcon aria-hidden="true" className="mt-0.5 h-5 w-5 flex-shrink-0 text-primary-text" />
+                      {req}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {job.responsibilities?.length > 0 && (
+              <section className="border-t border-border p-6 sm:p-8" aria-labelledby="responsibilities-title">
+                <h2 id="responsibilities-title" className="section-title">
+                  Responsibilities
+                </h2>
+                <ul className="mt-3 space-y-2.5">
+                  {job.responsibilities.map((r, i) => (
+                    <li key={i} className="flex gap-3 text-[0.9375rem] leading-6 text-foreground/90">
+                      <span aria-hidden="true" className="mt-2.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary" />
+                      {r}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+          </article>
         </div>
       </div>
 
       {/* Apply Modal */}
-      <Modal isOpen={applyOpen} onClose={() => setApplyOpen(false)} title="Apply for this Position" size="lg">
-        <div className="space-y-5">
+      <Modal
+        isOpen={applyOpen}
+        onClose={() => setApplyOpen(false)}
+        title="Apply for this role"
+        description={`${job.title} at ${companyName}`}
+        size="lg"
+      >
+        <form onSubmit={handleApply} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-surface-300 mb-1.5">
-              Cover Letter <span className="text-surface-500">(optional)</span>
+            <label htmlFor="apply-cover-letter" className="label">
+              Cover letter <span className="font-normal text-muted-foreground">(optional)</span>
             </label>
             <textarea
               value={coverLetter}
               onChange={(e) => setCoverLetter(e.target.value)}
-              className="input min-h-[120px] resize-y"
-              placeholder="Tell the recruiter why you're a great fit..."
+              className="input min-h-[8rem] resize-y"
+              placeholder="What makes you a good fit for this role?"
               maxLength={3000}
+              aria-describedby="apply-cover-letter-count"
               id="apply-cover-letter"
             />
+            <p id="apply-cover-letter-count" className="hint">
+              {coverLetter.length} of 3,000 characters
+            </p>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-surface-300 mb-1.5">
-              Project Showcase <span className="text-surface-500">(optional)</span>
-            </label>
-            {projectShowcase.map((project, i) => (
-              <div key={i} className="p-4 rounded-xl bg-surface-800/30 mb-3 space-y-3">
-                <input
-                  type="text"
-                  value={project.title}
-                  onChange={(e) => {
-                    const updated = [...projectShowcase];
-                    updated[i].title = e.target.value;
-                    setProjectShowcase(updated);
-                  }}
-                  className="input"
-                  placeholder="Project title"
-                />
-                <textarea
-                  value={project.description}
-                  onChange={(e) => {
-                    const updated = [...projectShowcase];
-                    updated[i].description = e.target.value;
-                    setProjectShowcase(updated);
-                  }}
-                  className="input min-h-[60px] resize-y"
-                  placeholder="Brief description"
-                />
-                <input
-                  type="url"
-                  value={project.url}
-                  onChange={(e) => {
-                    const updated = [...projectShowcase];
-                    updated[i].url = e.target.value;
-                    setProjectShowcase(updated);
-                  }}
-                  className="input"
-                  placeholder="https://github.com/..."
-                />
-              </div>
-            ))}
+          <fieldset>
+            <legend className="label">
+              Projects <span className="font-normal text-muted-foreground">(optional)</span>
+            </legend>
+            <p className="hint -mt-0.5 mb-3">Add up to three projects that show relevant work.</p>
+            <div className="space-y-4">
+              {projectShowcase.map((project, i) => (
+                <div key={i} className="rounded-xl border border-border bg-muted/40 p-4">
+                  <p className="text-xs font-semibold text-muted-foreground">Project {i + 1}</p>
+                  <div className="mt-3 space-y-3">
+                    <div>
+                      <label htmlFor={`project-${i}-title`} className="label">
+                        Title
+                      </label>
+                      <input
+                        id={`project-${i}-title`}
+                        type="text"
+                        value={project.title}
+                        onChange={(e) => updateProject(i, 'title', e.target.value)}
+                        className="input"
+                        placeholder="e.g. Realtime expense splitter"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor={`project-${i}-description`} className="label">
+                        Description
+                      </label>
+                      <textarea
+                        id={`project-${i}-description`}
+                        value={project.description}
+                        onChange={(e) => updateProject(i, 'description', e.target.value)}
+                        className="input min-h-[4.5rem] resize-y"
+                        placeholder="What it does and what you built"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor={`project-${i}-url`} className="label">
+                        Link
+                      </label>
+                      <input
+                        id={`project-${i}-url`}
+                        type="url"
+                        value={project.url}
+                        onChange={(e) => updateProject(i, 'url', e.target.value)}
+                        className="input"
+                        placeholder="https://github.com/…"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
             {projectShowcase.length < 3 && (
               <button
                 type="button"
-                onClick={() => setProjectShowcase([...projectShowcase, { title: '', description: '', techStack: [], url: '' }])}
-                className="text-sm text-primary-400 hover:text-primary-300"
+                onClick={() => setProjectShowcase((prev) => [...prev, emptyProject()])}
+                className="btn-soft btn-sm mt-3"
               >
-                + Add another project
+                <PlusIcon aria-hidden="true" className="h-4 w-4" />
+                Add another project
               </button>
             )}
-          </div>
+          </fieldset>
 
-          <div className="flex gap-3 pt-2">
-            <button onClick={() => setApplyOpen(false)} className="btn-secondary flex-1">
+          <div className="flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:justify-end">
+            <button type="button" onClick={() => setApplyOpen(false)} className="btn-secondary">
               Cancel
             </button>
-            <button onClick={handleApply} disabled={applying} className="btn-primary flex-1" id="submit-application">
-              {applying ? 'Submitting...' : 'Submit Application'}
+            <button type="submit" disabled={applying} className="btn-primary" id="submit-application">
+              {applying && <ButtonSpinner />}
+              {applying ? 'Submitting…' : 'Submit application'}
             </button>
           </div>
-        </div>
+        </form>
       </Modal>
     </PageLayout>
   );

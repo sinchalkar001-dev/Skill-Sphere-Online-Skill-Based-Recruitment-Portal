@@ -1,17 +1,38 @@
 import { useState, useEffect, useCallback } from 'react';
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import PageLayout from '../../components/layout/PageLayout';
 import JobCard from '../../components/jobs/JobCard';
-import JobFilters from '../../components/jobs/JobFilters';
+import JobFilters, { hasActiveJobFilters } from '../../components/jobs/JobFilters';
 import Pagination from '../../components/common/Pagination';
-import { PageLoader } from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
 import jobsApi from '../../api/jobsApi';
 import { useDebounce } from '../../hooks/useDebounce';
+
+const JobListSkeleton = () => (
+  <ul aria-hidden="true" className="mt-6 space-y-3">
+    {[0, 1, 2].map((i) => (
+      <li key={i} className="card flex gap-4 p-5 sm:p-6">
+        <div className="skeleton hidden h-12 w-12 rounded-lg sm:block" />
+        <div className="flex-1 space-y-3">
+          <div className="skeleton h-5 w-1/2" />
+          <div className="skeleton h-4 w-1/4" />
+          <div className="skeleton h-4 w-3/4" />
+          <div className="flex gap-2">
+            <div className="skeleton h-5 w-16" />
+            <div className="skeleton h-5 w-20" />
+            <div className="skeleton h-5 w-14" />
+          </div>
+        </div>
+      </li>
+    ))}
+  </ul>
+);
 
 const JobListPage = () => {
   const [jobs, setJobs] = useState([]);
   const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [filters, setFilters] = useState({
     search: '',
     jobType: '',
@@ -38,6 +59,7 @@ const JobListPage = () => {
       console.error('Failed to fetch jobs:', err);
     } finally {
       setLoading(false);
+      setHasLoaded(true);
     }
   }, [page, debouncedSearch, filters.jobType, filters.experienceLevel, filters.locationType]);
 
@@ -54,43 +76,51 @@ const JobListPage = () => {
     setPage(1);
   };
 
+  const total = pagination?.total ?? jobs.length;
+
   return (
     <PageLayout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 page-enter">
-        <div className="mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-surface-100">
-            Browse <span className="gradient-text">Opportunities</span>
-          </h1>
-          <p className="text-surface-400 mt-1">
-            Find the perfect role that matches your skills
-          </p>
+      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+        <h1 className="page-title">Browse jobs</h1>
+        <p className="page-subtitle">Search by skill or keyword, then narrow down by job type, experience, and work style.</p>
+
+        <div className="mt-6">
+          <JobFilters filters={filters} onChange={setFilters} onReset={handleReset} />
         </div>
 
-        <JobFilters filters={filters} onChange={setFilters} onReset={handleReset} />
-
-        {loading ? (
-          <PageLoader />
+        {!hasLoaded || (loading && jobs.length === 0) ? (
+          <JobListSkeleton />
         ) : jobs.length === 0 ? (
-          <EmptyState
-            icon="🔍"
-            title="No jobs found"
-            description="Try adjusting your filters or search terms"
-            action={
-              <button onClick={handleReset} className="btn-secondary text-sm">
-                Clear Filters
-              </button>
-            }
-          />
+          <div className="card mt-6">
+            <EmptyState
+              icon={MagnifyingGlassIcon}
+              titleAs="h2"
+              title="No jobs match your search"
+              description="Try a different keyword, or clear some filters to see more roles."
+              action={
+                hasActiveJobFilters(filters) && (
+                  <button type="button" onClick={handleReset} className="btn-secondary btn-sm">
+                    Clear filters
+                  </button>
+                )
+              }
+            />
+          </div>
         ) : (
           <>
-            <p className="text-sm text-surface-400 mb-4">
-              {pagination?.total || jobs.length} jobs found
+            <p className="mt-6 text-sm text-muted-foreground" aria-live="polite">
+              {total} {total === 1 ? 'job' : 'jobs'} found
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <ul
+              aria-busy={loading}
+              className={`mt-3 space-y-3 transition-opacity duration-150 ${loading ? 'opacity-60' : ''}`}
+            >
               {jobs.map((job) => (
-                <JobCard key={job._id} job={job} />
+                <li key={job._id}>
+                  <JobCard job={job} />
+                </li>
               ))}
-            </div>
+            </ul>
             <Pagination pagination={pagination} onPageChange={setPage} />
           </>
         )}

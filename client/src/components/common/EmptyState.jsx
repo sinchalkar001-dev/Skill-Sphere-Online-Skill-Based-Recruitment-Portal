@@ -1,16 +1,17 @@
-const EmptyState = ({ icon, title, description, action }) => {
+const EmptyState = ({ icon: Icon, title, description, action, titleAs: Title = 'h3', className = '' }) => {
   return (
-    <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-      {icon && (
-        <div className="w-20 h-20 rounded-2xl bg-surface-800/50 flex items-center justify-center mb-6">
-          <span className="text-4xl">{icon}</span>
-        </div>
+    <div className={`flex flex-col items-center px-6 py-14 text-center ${className}`}>
+      {Icon && (
+        <span
+          aria-hidden="true"
+          className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-muted text-muted-foreground"
+        >
+          <Icon className="h-6 w-6" />
+        </span>
       )}
-      <h3 className="text-xl font-semibold text-surface-200 mb-2">{title}</h3>
-      {description && (
-        <p className="text-surface-400 max-w-md mb-6">{description}</p>
-      )}
-      {action && action}
+      <Title className="text-base font-semibold text-foreground">{title}</Title>
+      {description && <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">{description}</p>}
+      {action && <div className="mt-6">{action}</div>}
     </div>
   );
 };

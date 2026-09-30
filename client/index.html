@@ -1,18 +1,29 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Skill Sphere — Project-based, assessment-driven recruitment platform connecting skilled candidates with top employers." />
+    <meta name="description" content="Skill Sphere — project-based, assessment-driven recruitment that connects skilled candidates with employers." />
     <meta name="keywords" content="recruitment, hiring, skills, jobs, assessment, portfolio" />
-    <meta name="theme-color" content="#4f46e5" />
+    <meta name="theme-color" content="#F4F8FB" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0A1422" media="(prefers-color-scheme: dark)" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400..800&display=swap" rel="stylesheet" />
+    <script>
+      // Apply the saved (or system) theme before first paint to avoid a flash.
+      (function () {
+        try {
+          var stored = localStorage.getItem('theme');
+          var dark = stored ? stored === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+          document.documentElement.classList.toggle('dark', dark);
+        } catch (e) {}
+      })();
+    </script>
     <title>Skill Sphere — Skill-Based Recruitment Portal</title>
   </head>
-  <body class="font-sans antialiased">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

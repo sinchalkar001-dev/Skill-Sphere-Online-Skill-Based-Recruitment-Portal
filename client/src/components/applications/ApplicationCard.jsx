@@ -1,77 +1,68 @@
 import { Link } from 'react-router-dom';
+import { MapPinIcon, CalendarDaysIcon } from '@heroicons/react/24/outline';
 import StatusBadge from './StatusBadge';
-import { formatDate, formatSalary, getJobTypeLabel } from '../../utils/helpers';
-import { BuildingOffice2Icon, MapPinIcon, CalendarDaysIcon } from '@heroicons/react/24/outline';
+import Avatar from '../common/Avatar';
+import ScoreMeter from '../common/ScoreMeter';
+import { formatDate } from '../../utils/helpers';
 
+// A list row; place inside a <ul className="divide-y ..."> within a card.
 const ApplicationCard = ({ application, showJob = true }) => {
   const job = application.job;
   const recruiterName = job?.recruiter?.company?.name || job?.recruiter?.name || '';
+  const score = application.assessment?.percentageScore;
 
   return (
-    <Link
-      to={`/applications/${application._id}`}
-      className="glass-card-hover p-5 block"
+    <div
       id={`application-card-${application._id}`}
+      className="group relative flex gap-4 px-5 py-4 transition-colors hover:bg-muted/50 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-inset has-[:focus-visible]:ring-ring sm:px-6"
     >
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div className="flex-1 min-w-0">
-          {showJob && (
-            <h3 className="text-base font-bold text-surface-100 truncate">
-              {job?.title || 'Job'}
+      <Avatar name={recruiterName || job?.title} square className="hidden sm:inline-flex" />
+
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="truncate text-sm font-semibold text-foreground group-hover:text-primary-text sm:text-base">
+              <Link to={`/applications/${application._id}`} className="after:absolute after:inset-0 focus-visible:outline-none">
+                {showJob ? job?.title || 'Job' : 'View application'}
+              </Link>
             </h3>
-          )}
-          {recruiterName && (
-            <div className="flex items-center gap-1.5 mt-1">
-              <BuildingOffice2Icon className="h-3.5 w-3.5 text-surface-500" />
-              <span className="text-sm text-surface-400">{recruiterName}</span>
-            </div>
-          )}
-        </div>
-        <StatusBadge status={application.status} />
-      </div>
-
-      {job?.techStack && job.techStack.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-3">
-          {job.techStack.slice(0, 4).map((tech) => (
-            <span
-              key={tech}
-              className="px-2 py-0.5 bg-surface-700/50 text-surface-300 text-xs rounded-md"
-            >
-              {tech}
-            </span>
-          ))}
-        </div>
-      )}
-
-      <div className="flex items-center gap-4 text-xs text-surface-500">
-        {job?.location && (
-          <span className="flex items-center gap-1">
-            <MapPinIcon className="h-3.5 w-3.5" />
-            {job.location}
-          </span>
-        )}
-        <span className="flex items-center gap-1">
-          <CalendarDaysIcon className="h-3.5 w-3.5" />
-          Applied {formatDate(application.createdAt)}
-        </span>
-      </div>
-
-      {application.assessment?.percentageScore > 0 && (
-        <div className="mt-3 pt-3 border-t border-surface-700/30">
-          <div className="flex items-center gap-3">
-            <div className="flex-1 bg-surface-800 rounded-full h-2 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-primary-500 to-accent-500 transition-all"
-                style={{ width: `${application.assessment.percentageScore}%` }}
-              />
-            </div>
-            <span className="text-sm font-semibold text-primary-400">
-              {application.assessment.percentageScore}%
-            </span>
+            {recruiterName && <p className="mt-0.5 truncate text-sm text-muted-foreground">{recruiterName}</p>}
           </div>
+          <StatusBadge status={application.status} className="flex-shrink-0" />
         </div>
-      )}
-    </Link>
+
+        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          {job?.location && (
+            <span className="flex items-center gap-1.5">
+              <MapPinIcon aria-hidden="true" className="h-4 w-4 text-subtle-foreground" />
+              {job.location}
+            </span>
+          )}
+          <span className="flex items-center gap-1.5">
+            <CalendarDaysIcon aria-hidden="true" className="h-4 w-4 text-subtle-foreground" />
+            Applied {formatDate(application.createdAt)}
+          </span>
+        </div>
+
+        {job?.techStack?.length > 0 && (
+          <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Tech stack">
+            {job.techStack.slice(0, 4).map((tech) => (
+              <li key={tech} className="chip">
+                {tech}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {score > 0 && (
+          <div className="mt-3 flex items-center gap-3">
+            <span className="text-xs font-medium text-muted-foreground">Score</span>
+            <ScoreMeter value={score} max={100} size="sm" decorative className="max-w-[10rem]" />
+            <span className="text-sm font-semibold tabular-nums text-foreground">{score}%</span>
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 

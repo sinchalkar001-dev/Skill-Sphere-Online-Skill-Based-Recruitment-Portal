@@ -1,21 +1,15 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { DocumentTextIcon } from '@heroicons/react/24/outline';
 import PageLayout from '../../components/layout/PageLayout';
 import ApplicationCard from '../../components/applications/ApplicationCard';
 import Pagination from '../../components/common/Pagination';
 import { PageLoader } from '../../components/common/LoadingSpinner';
 import EmptyState from '../../components/common/EmptyState';
 import applicationsApi from '../../api/applicationsApi';
-import { Link } from 'react-router-dom';
+import { APPLICATION_STATUSES } from '../../utils/helpers';
 
-const statusFilters = [
-  { value: '', label: 'All' },
-  { value: 'applied', label: 'Applied' },
-  { value: 'reviewing', label: 'Reviewing' },
-  { value: 'shortlisted', label: 'Shortlisted' },
-  { value: 'assessed', label: 'Assessed' },
-  { value: 'accepted', label: 'Accepted' },
-  { value: 'rejected', label: 'Rejected' },
-];
+const statusFilters = [{ value: '', label: 'All' }, ...APPLICATION_STATUSES];
 
 const MyApplicationsPage = () => {
   const [applications, setApplications] = useState([]);
@@ -44,22 +38,28 @@ const MyApplicationsPage = () => {
 
   return (
     <PageLayout>
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 page-enter">
-        <h1 className="text-2xl font-bold text-surface-100 mb-2">
-          My <span className="gradient-text">Applications</span>
-        </h1>
-        <p className="text-surface-400 mb-6">Track the status of all your job applications</p>
+      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+        <h1 className="page-title">My applications</h1>
+        <p className="page-subtitle">Track every application from submission to decision.</p>
 
-        {/* Status Filter Tabs */}
-        <div className="flex flex-wrap gap-2 mb-6">
+        <div
+          role="group"
+          aria-label="Filter by status"
+          className="-mx-4 mt-6 flex gap-1 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0"
+        >
           {statusFilters.map((f) => (
             <button
               key={f.value}
-              onClick={() => { setActiveFilter(f.value); setPage(1); }}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+              type="button"
+              onClick={() => {
+                setActiveFilter(f.value);
+                setPage(1);
+              }}
+              aria-pressed={activeFilter === f.value}
+              className={`btn btn-sm flex-shrink-0 ${
                 activeFilter === f.value
-                  ? 'bg-primary-600/20 text-primary-400 border border-primary-500/30'
-                  : 'text-surface-400 hover:bg-surface-800 border border-transparent'
+                  ? 'bg-primary-soft text-primary-soft-foreground'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               }`}
             >
               {f.label}
@@ -70,21 +70,32 @@ const MyApplicationsPage = () => {
         {loading ? (
           <PageLoader />
         ) : applications.length === 0 ? (
-          <EmptyState
-            icon="📭"
-            title="No applications found"
-            description={activeFilter ? 'No applications with this status' : 'Start applying to jobs to see your applications here'}
-            action={
-              <Link to="/jobs" className="btn-primary text-sm">Browse Jobs</Link>
-            }
-          />
+          <div className="card mt-4">
+            <EmptyState
+              icon={DocumentTextIcon}
+              titleAs="h2"
+              title={activeFilter ? 'No applications with this status' : 'No applications yet'}
+              description={
+                activeFilter
+                  ? 'Choose another status above, or view all of your applications.'
+                  : 'When you apply for a role, you can follow its progress here.'
+              }
+              action={
+                <Link to="/jobs" className="btn-primary btn-sm">
+                  Browse jobs
+                </Link>
+              }
+            />
+          </div>
         ) : (
           <>
-            <div className="space-y-4">
+            <ul className="card mt-4 divide-y divide-border overflow-hidden">
               {applications.map((app) => (
-                <ApplicationCard key={app._id} application={app} />
+                <li key={app._id}>
+                  <ApplicationCard application={app} />
+                </li>
               ))}
-            </div>
+            </ul>
             <Pagination pagination={pagination} onPageChange={setPage} />
           </>
         )}
