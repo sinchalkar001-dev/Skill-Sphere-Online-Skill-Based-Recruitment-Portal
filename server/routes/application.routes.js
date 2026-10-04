@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   createApplication,
+  getApplicationStats,
   getMyApplications,
   getJobApplications,
   getApplicationById,
@@ -28,6 +29,9 @@ router.get('/my', roleGuard('candidate'), getMyApplications);
 
 // Recruiter routes
 router.get('/job/:jobId', roleGuard('recruiter'), getJobApplications);
+
+// Dashboard numbers for either role (must be declared before '/:id')
+router.get('/stats', getApplicationStats);
 
 // Shared routes (with authorization check inside controller)
 router.get('/:id', getApplicationById);

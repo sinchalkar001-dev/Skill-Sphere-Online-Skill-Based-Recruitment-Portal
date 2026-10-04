@@ -21,7 +21,9 @@ import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
 import jobsApi from '../../api/jobsApi';
-import { formatDate } from '../../utils/helpers';
+import applicationsApi from '../../api/applicationsApi';
+import StatusBadge from '../../components/applications/StatusBadge';
+import { formatDate, APPLICATION_STATUSES } from '../../utils/helpers';
 import toast from 'react-hot-toast';
 
 const RecruiterDashboard = () => {
@@ -29,6 +31,7 @@ const RecruiterDashboard = () => {
   const { notifications } = useNotifications();
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [pipeline, setPipeline] = useState(null);
   // The target outlives `confirmOpen` so the dialog keeps its text while it animates out.
   const [jobToDelete, setJobToDelete] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -37,8 +40,12 @@ const RecruiterDashboard = () => {
   useEffect(() => {
     const fetchJobs = async () => {
       try {
-        const { data } = await jobsApi.getMyJobs({ limit: 50 });
+        const [{ data }, statsRes] = await Promise.all([
+          jobsApi.getMyJobs({ limit: 50 }),
+          applicationsApi.getStats(),
+        ]);
         setJobs(data.data.jobs);
+        setPipeline(statsRes.data.data.stats);
       } catch (err) {
         console.error('Failed to fetch jobs:', err);
       } finally {
@@ -200,6 +207,26 @@ const RecruiterDashboard = () => {
           </section>
 
           <div className="space-y-6">
+            {pipeline && pipeline.total > 0 && (
+              <section className="card p-5" aria-labelledby="pipeline-title">
+                <div className="flex items-baseline justify-between gap-4">
+                  <h2 id="pipeline-title" className="section-title">
+                    Pipeline
+                  </h2>
+                  <span className="text-sm text-muted-foreground">{pipeline.total} applications</span>
+                </div>
+                <dl className="mt-4 space-y-2.5">
+                  {APPLICATION_STATUSES.map(({ value }) => (
+                    <div key={value} className="flex items-center justify-between gap-4">
+                      <dt>
+                        <StatusBadge status={value} />
+                      </dt>
+                      <dd className="text-sm font-semibold tabular-nums text-foreground">{pipeline.byStatus[value]}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+            )}
             <QuickActions role="recruiter" />
             <RecentActivity activities={notifications} />
           </div>

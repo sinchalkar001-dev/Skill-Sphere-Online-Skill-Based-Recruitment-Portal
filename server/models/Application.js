@@ -27,13 +27,11 @@ const applicationSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Job',
       required: true,
-      index: true,
     },
     candidate: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
-      index: true,
     },
     coverLetter: {
       type: String,
@@ -70,7 +68,16 @@ const applicationSchema = new mongoose.Schema(
 
 // Ensure one application per candidate per job
 applicationSchema.index({ job: 1, candidate: 1 }, { unique: true });
-applicationSchema.index({ status: 1 });
+// Recruiter views. A posting can hold hundreds of applications, so each list
+// and count is served from an index rather than by scanning the posting:
+//   status tab, newest first + per-status counts (covered)
+applicationSchema.index({ job: 1, status: 1, createdAt: -1 });
+//   "All" tab, newest first
+applicationSchema.index({ job: 1, createdAt: -1 });
+//   ranked by assessment score
+applicationSchema.index({ job: 1, 'assessment.percentageScore': -1 });
+// Candidate views: own applications by status + dashboard counts (covered)
+applicationSchema.index({ candidate: 1, status: 1, createdAt: -1 });
 
 // Auto-add status history on status change
 applicationSchema.pre('save', function (next) {

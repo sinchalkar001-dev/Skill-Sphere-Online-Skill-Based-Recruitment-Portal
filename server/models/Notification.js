@@ -6,7 +6,6 @@ const notificationSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
-      index: true,
     },
     type: {
       type: String,
@@ -34,8 +33,10 @@ const notificationSchema = new mongoose.Schema(
   }
 );
 
-// Indexes for efficient queries
-notificationSchema.index({ recipient: 1, isRead: 1, createdAt: -1 });
+// Notification list, newest first
+notificationSchema.index({ recipient: 1, createdAt: -1 });
+// Unread badge count
+notificationSchema.index({ recipient: 1, isRead: 1 });
 
 const Notification = mongoose.model('Notification', notificationSchema);
 export default Notification;

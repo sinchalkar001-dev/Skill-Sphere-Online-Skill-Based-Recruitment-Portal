@@ -1,7 +1,9 @@
 import { Job, Application } from '../models/index.js';
 import ApiError from '../utils/ApiError.js';
 import asyncHandler from '../utils/asyncHandler.js';
-import { parsePagination, paginationMeta } from '../utils/helpers.js';
+import { parsePagination, paginationMeta, escapeRegex } from '../utils/helpers.js';
+import { toSkillKeys } from '../utils/skills.js';
+import { trackSkillUsage } from '../services/skill.service.js';
 
 /**
  * @desc    Get all active jobs (public, paginated, filterable)
@@ -25,22 +27,22 @@ export const getJobs = asyncHandler(async (req, res) => {
   // Build filter
   const filter = { isActive: true };
 
-  // Text search
+  // Keyword search across title, skill tags and description
   if (search) {
     filter.$text = { $search: search };
   }
 
-  // Tech stack filter (match any)
+  // Skill tag filter (match any, case-insensitive via the normalised keys)
   if (techStack) {
-    const tags = techStack.split(',').map((t) => t.trim().toLowerCase());
-    filter.techStack = { $in: tags };
+    const keys = toSkillKeys(String(techStack).split(','));
+    if (keys.length > 0) filter.techStackKeys = { $in: keys };
   }
 
   // Enum filters
   if (jobType) filter.jobType = jobType;
   if (experienceLevel) filter.experienceLevel = experienceLevel;
   if (locationType) filter.locationType = locationType;
-  if (location) filter.location = { $regex: location, $options: 'i' };
+  if (location) filter.location = { $regex: escapeRegex(location), $options: 'i' };
 
   // Salary range
   if (salaryMin) filter['salary.min'] = { $gte: parseInt(salaryMin, 10) };
@@ -105,6 +107,7 @@ export const createJob = asyncHandler(async (req, res) => {
   };
 
   const job = await Job.create(jobData);
+  await trackSkillUsage('jobCount', [], job.techStack);
   const populated = await Job.findById(job._id)
     .populate('recruiter', 'name email avatar company')
     .lean();
@@ -134,19 +137,20 @@ export const updateJob = asyncHandler(async (req, res) => {
   }
 
   // Prevent updating certain fields
-  const { recruiter, applicationsCount, ...updateData } = req.body;
+  const { recruiter, applicationsCount, techStackKeys, ...updateData } = req.body;
 
-  const updatedJob = await Job.findByIdAndUpdate(req.params.id, updateData, {
-    new: true,
-    runValidators: true,
-  })
-    .populate('recruiter', 'name email avatar company')
-    .lean();
+  // Saving the document (rather than findByIdAndUpdate) runs validators and the
+  // hook that keeps the skill keys in step with the tech stack
+  const previousTechStack = [...job.techStack];
+  job.set(updateData);
+  await job.save();
+  await trackSkillUsage('jobCount', previousTechStack, job.techStack);
+  await job.populate('recruiter', 'name email avatar company');
 
   res.json({
     status: 'success',
     message: 'Job updated successfully',
-    data: { job: updatedJob },
+    data: { job },
   });
 });
 
@@ -169,6 +173,7 @@ export const deleteJob = asyncHandler(async (req, res) => {
   // Delete associated applications
   await Application.deleteMany({ job: job._id });
   await Job.findByIdAndDelete(req.params.id);
+  await trackSkillUsage('jobCount', job.techStack, []);
 
   res.json({
     status: 'success',

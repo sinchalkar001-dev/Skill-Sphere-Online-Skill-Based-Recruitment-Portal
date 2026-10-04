@@ -4,6 +4,8 @@ import ApiError from '../utils/ApiError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import env from '../config/env.js';
 import { createNotification } from '../services/notification.service.js';
+import { trackSkillUsage } from '../services/skill.service.js';
+import { invalidateUserCache } from '../middleware/auth.js';
 
 // Generate JWT tokens
 const generateTokens = (userId) => {
@@ -166,6 +168,12 @@ export const updateProfile = asyncHandler(async (req, res) => {
     throw ApiError.notFound('User not found');
   }
 
+  invalidateUserCache(user._id);
+
+  if (user.role === 'candidate' && updates.skills !== undefined) {
+    await trackSkillUsage('candidateCount', req.user.skills, user.skills);
+  }
+
   res.json({
     status: 'success',
     message: 'Profile updated successfully',
@@ -194,6 +202,7 @@ export const changePassword = asyncHandler(async (req, res) => {
 
   user.password = newPassword;
   await user.save();
+  invalidateUserCache(user._id);
 
   // Generate new tokens
   const { accessToken, refreshToken } = generateTokens(user._id);

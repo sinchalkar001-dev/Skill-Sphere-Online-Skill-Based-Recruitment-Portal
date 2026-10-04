@@ -28,18 +28,19 @@ const CandidateDashboard = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const { data } = await applicationsApi.getMyApplications({ limit: 5 });
-        const apps = data.data.applications;
-        setApplications(apps);
+        const [recent, statsRes] = await Promise.all([
+          applicationsApi.getMyApplications({ limit: 5 }),
+          applicationsApi.getStats(),
+        ]);
+        setApplications(recent.data.data.applications);
 
-        // Calculate stats from all applications
-        const allRes = await applicationsApi.getMyApplications({ limit: 100 });
-        const allApps = allRes.data.data.applications;
+        // Counted on the server, so the numbers are right however many applications there are
+        const { total, byStatus } = statsRes.data.data.stats;
         setStats({
-          total: allApps.length,
-          reviewing: allApps.filter((a) => a.status === 'reviewing').length,
-          shortlisted: allApps.filter((a) => ['shortlisted', 'assessed'].includes(a.status)).length,
-          accepted: allApps.filter((a) => a.status === 'accepted').length,
+          total,
+          reviewing: byStatus.reviewing,
+          shortlisted: byStatus.shortlisted + byStatus.assessed,
+          accepted: byStatus.accepted,
         });
       } catch (err) {
         console.error('Failed to fetch dashboard data:', err);

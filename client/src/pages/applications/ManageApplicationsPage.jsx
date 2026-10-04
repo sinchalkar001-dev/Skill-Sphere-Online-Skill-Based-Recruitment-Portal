@@ -16,6 +16,7 @@ import PageLayout from '../../components/layout/PageLayout';
 import StatusBadge from '../../components/applications/StatusBadge';
 import Modal from '../../components/common/Modal';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
+import Pagination from '../../components/common/Pagination';
 import Avatar from '../../components/common/Avatar';
 import ScoreMeter from '../../components/common/ScoreMeter';
 import { PageLoader, ButtonSpinner } from '../../components/common/LoadingSpinner';
@@ -32,6 +33,11 @@ const ManageApplicationsPage = () => {
   const [jobTitle, setJobTitle] = useState('');
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
+  const [sort, setSort] = useState('-createdAt');
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState(null);
+  const [statusCounts, setStatusCounts] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Assessment modal
   const [assessOpen, setAssessOpen] = useState(false);
@@ -47,11 +53,13 @@ const ManageApplicationsPage = () => {
   useEffect(() => {
     const fetchApplications = async () => {
       try {
-        const params = { limit: 50 };
+        const params = { page, limit: 20, sort };
         if (statusFilter) params.status = statusFilter;
         const { data } = await applicationsApi.getJobApplications(jobId, params);
         setApplications(data.data.applications);
         setJobTitle(data.data.job?.title || '');
+        setPagination(data.pagination);
+        setStatusCounts(data.data.statusCounts);
       } catch (err) {
         console.error('Failed to fetch applications:', err);
       } finally {
@@ -59,7 +67,7 @@ const ManageApplicationsPage = () => {
       }
     };
     fetchApplications();
-  }, [jobId, statusFilter]);
+  }, [jobId, statusFilter, sort, page, refreshKey]);
 
   const handleStatusChange = async (appId, newStatus) => {
     try {
@@ -67,6 +75,7 @@ const ManageApplicationsPage = () => {
       setApplications((prev) =>
         prev.map((a) => (a._id === appId ? { ...a, status: newStatus } : a))
       );
+      setRefreshKey((key) => key + 1); // refresh the per-status counts
       toast.success(`Status changed to ${getStatusLabel(newStatus)}`);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to update status');
@@ -105,6 +114,7 @@ const ManageApplicationsPage = () => {
       setApplications((prev) =>
         prev.map((a) => (a._id === selectedApp._id ? { ...a, status: 'assessed', assessment: data.data.application.assessment } : a))
       );
+      setRefreshKey((key) => key + 1);
       toast.success('Assessment submitted');
       setAssessOpen(false);
     } catch (err) {
@@ -132,10 +142,24 @@ const ManageApplicationsPage = () => {
             <h1 className="page-title">Applicants</h1>
             {jobTitle && <p className="page-subtitle truncate">{jobTitle}</p>}
           </div>
-          <p className="text-sm text-muted-foreground">
-            {applications.length} {applications.length === 1 ? 'applicant' : 'applicants'}
-            {statusFilter && ` ${getStatusLabel(statusFilter).toLowerCase()}`}
-          </p>
+          <div className="flex items-center gap-2">
+            <label htmlFor="applicant-sort" className="text-sm text-muted-foreground">
+              Sort by
+            </label>
+            <select
+              id="applicant-sort"
+              value={sort}
+              onChange={(e) => {
+                setSort(e.target.value);
+                setPage(1);
+              }}
+              className="input w-auto py-2"
+            >
+              <option value="-createdAt">Newest first</option>
+              <option value="createdAt">Oldest first</option>
+              <option value="-score">Highest score</option>
+            </select>
+          </div>
         </div>
 
         <div
@@ -147,7 +171,10 @@ const ManageApplicationsPage = () => {
             <button
               key={s.value}
               type="button"
-              onClick={() => setStatusFilter(s.value)}
+              onClick={() => {
+                setStatusFilter(s.value);
+                setPage(1);
+              }}
               aria-pressed={statusFilter === s.value}
               className={`btn btn-sm flex-shrink-0 ${
                 statusFilter === s.value
@@ -156,6 +183,9 @@ const ManageApplicationsPage = () => {
               }`}
             >
               {s.label}
+              {statusCounts && (
+                <span className="tabular-nums opacity-80">{s.value ? statusCounts.byStatus[s.value] : statusCounts.total}</span>
+              )}
             </button>
           ))}
         </div>
@@ -291,6 +321,8 @@ const ManageApplicationsPage = () => {
             })}
           </ul>
         )}
+
+        <Pagination pagination={pagination} onPageChange={setPage} />
       </div>
 
       {/* Assessment Modal */}

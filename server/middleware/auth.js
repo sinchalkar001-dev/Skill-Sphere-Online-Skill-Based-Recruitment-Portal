@@ -3,6 +3,26 @@ import { User } from '../models/index.js';
 import ApiError from '../utils/ApiError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import env from '../config/env.js';
+import { createTtlCache } from '../utils/ttlCache.js';
+
+// The token proves who is calling; the user record adds role and active status.
+// Reusing it for a short time saves a database read on every authenticated
+// request. Treat req.user as read-only: the same object serves concurrent requests.
+const userCache = createTtlCache({ ttlMs: env.AUTH_CACHE_TTL_MS });
+
+const findUser = async (id) => {
+  const key = String(id);
+  let user = userCache.get(key);
+  if (!user) {
+    // The password is never selected (see the schema); lean() skips document hydration
+    user = await User.findById(id).lean();
+    if (user) userCache.set(key, user);
+  }
+  return user;
+};
+
+/** Call after changing a user so their next request sees the new record. */
+export const invalidateUserCache = (id) => userCache.delete(String(id));
 
 /**
  * Protect routes — verify JWT and attach user to request
@@ -23,8 +43,8 @@ export const protect = asyncHandler(async (req, res, next) => {
     // Verify token
     const decoded = jwt.verify(token, env.JWT_SECRET);
 
-    // Attach user to request (exclude password)
-    const user = await User.findById(decoded.id).select('-password');
+    // Attach user to request
+    const user = await findUser(decoded.id);
     if (!user) {
       throw ApiError.unauthorized('User belonging to this token no longer exists.');
     }
@@ -58,7 +78,7 @@ export const optionalAuth = asyncHandler(async (req, res, next) => {
   if (token) {
     try {
       const decoded = jwt.verify(token, env.JWT_SECRET);
-      req.user = await User.findById(decoded.id).select('-password');
+      req.user = await findUser(decoded.id);
     } catch {
       // Token invalid — continue without user
     }

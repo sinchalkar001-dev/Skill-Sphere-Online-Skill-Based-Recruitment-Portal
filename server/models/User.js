@@ -23,7 +23,9 @@ const userSchema = new mongoose.Schema(
       unique: true,
       lowercase: true,
       trim: true,
-      match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Invalid email format'],
+      // Shape check only (the request validator does the strict check). The domain
+      // ending is not length-limited: .info, .tech and .email are all valid.
+      match: [/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/, 'Invalid email format'],
     },
     password: {
       type: String,

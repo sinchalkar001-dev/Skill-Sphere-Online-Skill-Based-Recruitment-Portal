@@ -11,6 +11,7 @@ import { initializeSocket } from './config/socket.js';
 import routes from './routes/index.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
+import { startEmailWorker, stopEmailWorker } from './services/email.service.js';
 
 // ── Create Express app ──
 const app = express();
@@ -62,6 +63,9 @@ const startServer = async () => {
     // Connect to MongoDB
     await connectDB();
 
+    // Retries queued emails whose delivery failed (see services/email.service.js)
+    startEmailWorker();
+
     httpServer.listen(env.PORT, () => {
       console.log(`\n🚀 Skill Sphere Server`);
       console.log(`   Environment: ${env.NODE_ENV}`);
@@ -78,6 +82,7 @@ const startServer = async () => {
 // ── Graceful Shutdown ──
 const gracefulShutdown = async (signal) => {
   console.log(`\n${signal} received. Shutting down gracefully...`);
+  stopEmailWorker();
   httpServer.close(() => {
     console.log('HTTP server closed');
     process.exit(0);

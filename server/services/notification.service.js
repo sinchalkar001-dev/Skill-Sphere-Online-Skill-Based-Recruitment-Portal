@@ -1,6 +1,6 @@
 import { Notification } from '../models/index.js';
 import { getIO } from '../config/socket.js';
-import { sendEmail } from './email.service.js';
+import { queueEmail } from './email.service.js';
 
 /**
  * Create and send an in-app notification + optional email
@@ -31,23 +31,28 @@ export const createNotification = async ({
     try {
       const io = getIO();
       io.to(`user:${recipientId}`).emit('notification', {
-        id: notification._id,
+        _id: notification._id,
         type,
         title,
         message,
+        relatedJob,
+        relatedApplication,
+        isRead: false,
         createdAt: notification.createdAt,
       });
     } catch {
       // Socket not initialized — skip real-time
     }
 
-    // Send email notification
+    // Queue the email; delivery (and any retries) happens in the background and
+    // sets notification.isEmailSent once the mail server accepts it
     if (emailTemplate && recipientEmail && emailData) {
-      const sent = await sendEmail(recipientEmail, emailTemplate, emailData);
-      if (sent) {
-        notification.isEmailSent = true;
-        await notification.save();
-      }
+      await queueEmail({
+        to: recipientEmail,
+        template: emailTemplate,
+        data: emailData,
+        notificationId: notification._id,
+      });
     }
 
     return notification;
