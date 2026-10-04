@@ -47,9 +47,17 @@ before(async () => {
   server = spawn(process.execPath, ['server.js'], {
     cwd: SERVER_DIR,
     env: { ...process.env, PORT: String(PORT) },
-    stdio: 'ignore',
+    stdio: ['ignore', 'ignore', 'pipe'],
   });
-  for (let i = 0; i < 60; i++) {
+  let serverErrors = '';
+  server.stderr.on('data', (chunk) => {
+    serverErrors += chunk;
+  });
+
+  // Starting Node and connecting to MongoDB can take a while on a busy machine
+  const deadline = Date.now() + 60_000;
+  while (Date.now() < deadline) {
+    if (server.exitCode !== null) break;
     try {
       if ((await fetch(`${BASE}/health`)).ok) return;
     } catch {
@@ -57,7 +65,7 @@ before(async () => {
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  throw new Error('Server did not start');
+  throw new Error(`Test server did not start${serverErrors ? `:\n${serverErrors}` : ' within 60 s'}`);
 });
 
 after(async () => {
