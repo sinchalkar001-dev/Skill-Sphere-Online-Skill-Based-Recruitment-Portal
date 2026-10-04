@@ -1,14 +1,44 @@
-import { useState } from 'react';
+import { useState, useEffect, useId } from 'react';
 import { XMarkIcon, PlusIcon } from '@heroicons/react/24/outline';
+import skillsApi from '../../api/skillsApi';
+import { useDebounce } from '../../hooks/useDebounce';
+
+const sameSkill = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
 const TechTagInput = ({ tags = [], onChange, placeholder = 'Add a technology', maxTags = 15, id }) => {
   const [input, setInput] = useState('');
+  const [suggestions, setSuggestions] = useState([]);
+  const listId = useId();
+  const debouncedInput = useDebounce(input, 200);
   const atLimit = tags.length >= maxTags;
+
+  // Suggest skills already used on the platform, so tags share one spelling
+  useEffect(() => {
+    const query = debouncedInput.trim();
+    if (!query) {
+      setSuggestions([]);
+      return undefined;
+    }
+    let cancelled = false;
+    skillsApi
+      .suggest(query)
+      .then(({ data }) => {
+        if (!cancelled) setSuggestions(data.data.skills.map((skill) => skill.name));
+      })
+      .catch(() => {
+        // Suggestions are optional; typing a new tag still works
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedInput]);
 
   const addTag = (tag) => {
     const trimmed = tag.trim();
-    if (trimmed && !tags.includes(trimmed) && tags.length < maxTags) {
-      onChange([...tags, trimmed]);
+    // "react" becomes "React" when the catalogue already knows the skill
+    const name = suggestions.find((suggestion) => sameSkill(suggestion, trimmed)) || trimmed;
+    if (name && !tags.some((existing) => sameSkill(existing, name)) && tags.length < maxTags) {
+      onChange([...tags, name]);
     }
     setInput('');
   };
@@ -59,8 +89,17 @@ const TechTagInput = ({ tags = [], onChange, placeholder = 'Add a technology', m
           placeholder={atLimit ? 'Maximum reached' : placeholder}
           disabled={atLimit}
           aria-describedby={id ? `${id}-hint` : undefined}
+          list={listId}
+          autoComplete="off"
           className="input flex-1"
         />
+        <datalist id={listId}>
+          {suggestions
+            .filter((name) => !tags.some((existing) => sameSkill(existing, name)))
+            .map((name) => (
+              <option key={name} value={name} />
+            ))}
+        </datalist>
         <button
           type="button"
           onClick={() => addTag(input)}

@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { toSkillKeys } from '../utils/skills.js';
 
 const assessmentCriteriaSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
@@ -22,11 +23,12 @@ const jobSchema = new mongoose.Schema(
     requirements: [{ type: String, trim: true }],
     responsibilities: [{ type: String, trim: true }],
     techStack: [{ type: String, trim: true }],
+    // Normalised copy of techStack for case-insensitive, index-backed filtering
+    techStackKeys: { type: [String], select: false },
     recruiter: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
-      index: true,
     },
     salary: {
       min: { type: Number, min: 0 },
@@ -73,9 +75,24 @@ const jobSchema = new mongoose.Schema(
 );
 
 // Indexes
+// Job board: newest active jobs
 jobSchema.index({ isActive: 1, createdAt: -1 });
-jobSchema.index({ techStack: 1 });
-jobSchema.index({ title: 'text', description: 'text' });
+// Job board filtered by skill tag (multikey compound)
+jobSchema.index({ isActive: 1, techStackKeys: 1, createdAt: -1 });
+// Recruiter dashboard: a recruiter's postings, newest first
+jobSchema.index({ recruiter: 1, createdAt: -1 });
+// Keyword search across title, skill tags and description
+jobSchema.index(
+  { title: 'text', techStack: 'text', description: 'text' },
+  { name: 'job_search', weights: { title: 10, techStack: 5, description: 1 } }
+);
+
+jobSchema.pre('save', function (next) {
+  if (this.isNew || this.isModified('techStack')) {
+    this.techStackKeys = toSkillKeys(this.techStack);
+  }
+  next();
+});
 
 // Virtual: check if deadline has passed
 jobSchema.virtual('isExpired').get(function () {

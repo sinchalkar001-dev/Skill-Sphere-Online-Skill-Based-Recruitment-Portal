@@ -1,9 +1,15 @@
-import { Application, Job, User } from '../models/index.js';
+import { Application, Job } from '../models/index.js';
 import ApiError from '../utils/ApiError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { parsePagination, paginationMeta } from '../utils/helpers.js';
 import { createNotification } from '../services/notification.service.js';
-import { calculateAssessmentScore } from '../services/assessment.service.js';
+import {
+  submitApplication,
+  withdrawApplication as withdraw,
+  getJobStatusCounts,
+  getCandidateStats,
+  getRecruiterStats,
+} from '../services/application.service.js';
 
 /**
  * @desc    Submit a new application
@@ -13,41 +19,13 @@ import { calculateAssessmentScore } from '../services/assessment.service.js';
 export const createApplication = asyncHandler(async (req, res) => {
   const { jobId, coverLetter, portfolioLinks, projectShowcase } = req.body;
 
-  // Verify job exists and is active
-  const job = await Job.findById(jobId).populate('recruiter', 'name email');
-  if (!job) {
-    throw ApiError.notFound('Job not found');
-  }
-  if (!job.isActive) {
-    throw ApiError.badRequest('This job is no longer accepting applications');
-  }
-  if (job.isExpired) {
-    throw ApiError.badRequest('Application deadline has passed');
-  }
-  if (job.isFull) {
-    throw ApiError.badRequest('Maximum number of applications reached');
-  }
-
-  // Check for duplicate application
-  const existing = await Application.findOne({
-    job: jobId,
-    candidate: req.user._id,
-  });
-  if (existing) {
-    throw ApiError.conflict('You have already applied for this job');
-  }
-
-  // Create application
-  const application = await Application.create({
-    job: jobId,
-    candidate: req.user._id,
+  const { application, job } = await submitApplication({
+    jobId,
+    candidateId: req.user._id,
     coverLetter,
     portfolioLinks,
     projectShowcase,
   });
-
-  // Increment applications count
-  await Job.findByIdAndUpdate(jobId, { $inc: { applicationsCount: 1 } });
 
   // Notify recruiter
   await createNotification({
@@ -65,15 +43,35 @@ export const createApplication = asyncHandler(async (req, res) => {
     },
   });
 
-  const populated = await Application.findById(application._id)
-    .populate('job', 'title company techStack')
-    .populate('candidate', 'name email avatar skills')
-    .lean();
+  // Same shape a populated read would return, built from records already in hand
+  const { _id, name, email, avatar, skills } = req.user;
+  const populated = {
+    ...application.toObject(),
+    job: { _id: job._id, title: job.title, techStack: job.techStack },
+    candidate: { _id, name, email, avatar, skills },
+  };
 
   res.status(201).json({
     status: 'success',
     message: 'Application submitted successfully',
     data: { application: populated },
+  });
+});
+
+/**
+ * @desc    Dashboard numbers for the signed-in user
+ * @route   GET /api/applications/stats
+ * @access  Candidate (own applications) or Recruiter (pipeline across own postings)
+ */
+export const getApplicationStats = asyncHandler(async (req, res) => {
+  const stats =
+    req.user.role === 'recruiter'
+      ? await getRecruiterStats(req.user._id)
+      : await getCandidateStats(req.user._id);
+
+  res.json({
+    status: 'success',
+    data: { stats },
   });
 });
 
@@ -120,7 +118,7 @@ export const getJobApplications = asyncHandler(async (req, res) => {
   const { status, sort = '-createdAt' } = req.query;
 
   // Verify job ownership
-  const job = await Job.findById(req.params.jobId);
+  const job = await Job.findById(req.params.jobId).select('title recruiter').lean();
   if (!job) {
     throw ApiError.notFound('Job not found');
   }
@@ -128,7 +126,7 @@ export const getJobApplications = asyncHandler(async (req, res) => {
     throw ApiError.forbidden('You can only view applications for your own jobs');
   }
 
-  const filter = { job: req.params.jobId };
+  const filter = { job: job._id };
   if (status) filter.status = status;
 
   const sortMap = {
@@ -138,19 +136,21 @@ export const getJobApplications = asyncHandler(async (req, res) => {
     'score': { 'assessment.percentageScore': 1 },
   };
 
-  const [applications, total] = await Promise.all([
+  const [applications, statusCounts] = await Promise.all([
     Application.find(filter)
       .populate('candidate', 'name email avatar skills experience location portfolio projects')
       .sort(sortMap[sort] || { createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean(),
-    Application.countDocuments(filter),
+    getJobStatusCounts(job._id),
   ]);
+  // The per-status counts already hold the total for this filter
+  const total = status ? statusCounts.byStatus[status] ?? 0 : statusCounts.total;
 
   res.json({
     status: 'success',
-    data: { applications, job: { _id: job._id, title: job.title } },
+    data: { applications, job: { _id: job._id, title: job.title }, statusCounts },
     pagination: paginationMeta(total, page, limit),
   });
 });
@@ -257,24 +257,7 @@ export const updateApplicationStatus = asyncHandler(async (req, res) => {
  * @access  Candidate (owner)
  */
 export const withdrawApplication = asyncHandler(async (req, res) => {
-  const application = await Application.findById(req.params.id);
-
-  if (!application) {
-    throw ApiError.notFound('Application not found');
-  }
-
-  if (application.candidate.toString() !== req.user._id.toString()) {
-    throw ApiError.forbidden('You can only withdraw your own applications');
-  }
-
-  // Can only withdraw if not yet accepted
-  if (application.status === 'accepted') {
-    throw ApiError.badRequest('Cannot withdraw an accepted application');
-  }
-
-  // Decrement count
-  await Job.findByIdAndUpdate(application.job, { $inc: { applicationsCount: -1 } });
-  await Application.findByIdAndDelete(req.params.id);
+  await withdraw({ applicationId: req.params.id, candidateId: req.user._id });
 
   res.json({
     status: 'success',

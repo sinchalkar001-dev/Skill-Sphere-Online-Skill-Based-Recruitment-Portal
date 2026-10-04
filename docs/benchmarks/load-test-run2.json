@@ -1,0 +1,94 @@
+{
+  "ranAt": "2026-10-02T16:17:40.501Z",
+  "node": "v25.2.1",
+  "mongodb": "8.0.13",
+  "dataset": {
+    "recruiters": 30,
+    "candidates": 20000,
+    "jobs": 300,
+    "applications": 156112
+  },
+  "users": 200,
+  "rampUpS": 10,
+  "durationS": 60,
+  "thinkTimeMs": 1000,
+  "requests": 11387,
+  "requestsIncludingRampUp": 12437,
+  "requestsPerSecond": 190,
+  "failedRequests": 0,
+  "failuresByStatus": {},
+  "latencyMs": {
+    "p50": 37.1,
+    "p95": 145,
+    "p99": 237.1,
+    "max": 602.8
+  },
+  "endpoints": [
+    {
+      "name": "POST /applications",
+      "requests": 284,
+      "p50Ms": 91.9,
+      "p95Ms": 317.5
+    },
+    {
+      "name": "GET /applications/my",
+      "requests": 1184,
+      "p50Ms": 53.2,
+      "p95Ms": 201.8
+    },
+    {
+      "name": "GET /applications/job/:id",
+      "requests": 598,
+      "p50Ms": 51.4,
+      "p95Ms": 187.2
+    },
+    {
+      "name": "GET /jobs?search",
+      "requests": 1003,
+      "p50Ms": 38.6,
+      "p95Ms": 147.3
+    },
+    {
+      "name": "GET /jobs?techStack",
+      "requests": 971,
+      "p50Ms": 38.3,
+      "p95Ms": 140.2
+    },
+    {
+      "name": "GET /jobs",
+      "requests": 2414,
+      "p50Ms": 36.9,
+      "p95Ms": 131.7
+    },
+    {
+      "name": "GET /jobs/:id",
+      "requests": 1939,
+      "p50Ms": 35.1,
+      "p95Ms": 127.7
+    },
+    {
+      "name": "GET /applications/stats",
+      "requests": 1260,
+      "p50Ms": 30.7,
+      "p95Ms": 116.9
+    },
+    {
+      "name": "GET /jobs/my-jobs",
+      "requests": 395,
+      "p50Ms": 26.9,
+      "p95Ms": 106.6
+    },
+    {
+      "name": "GET /notifications",
+      "requests": 973,
+      "p50Ms": 25.6,
+      "p95Ms": 97.6
+    },
+    {
+      "name": "GET /skills",
+      "requests": 366,
+      "p50Ms": 22.4,
+      "p95Ms": 87.3
+    }
+  ]
+}

@@ -76,7 +76,9 @@ const AppRoutes = () => {
       <Route path="/applications/:id" element={<ProtectedRoute><ApplicationDetailPage /></ProtectedRoute>} />
 
       {/* Recruiter only */}
-      <Route path="/jobs/new" element={<ProtectedRoute roles={['recruiter']}><PostJobPage /></ProtectedRoute>} />
+      {/* Same form for both; the keys stop React reusing one route's form state in the other */}
+      <Route path="/jobs/new" element={<ProtectedRoute roles={['recruiter']}><PostJobPage key="new" /></ProtectedRoute>} />
+      <Route path="/jobs/:id/edit" element={<ProtectedRoute roles={['recruiter']}><PostJobPage key="edit" /></ProtectedRoute>} />
       <Route path="/jobs/:jobId/applications" element={<ProtectedRoute roles={['recruiter']}><ManageApplicationsPage /></ProtectedRoute>} />
 
       {/* 404 */}

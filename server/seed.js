@@ -1,7 +1,9 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import env from './config/env.js';
-import { User, Job, Application, Notification } from './models/index.js';
+import { User, Job, Application, Notification, Skill, EmailJob } from './models/index.js';
+import { syncDatabase } from './services/database.service.js';
+import { rebuildSkillCatalog } from './services/skill.service.js';
 
 const seed = async () => {
   try {
@@ -14,8 +16,13 @@ const seed = async () => {
       Job.deleteMany({}),
       Application.deleteMany({}),
       Notification.deleteMany({}),
+      Skill.deleteMany({}),
+      EmailJob.deleteMany({}),
     ]);
     console.log('✓ Cleared existing data');
+
+    await syncDatabase();
+    console.log('✓ Indexes in sync with schemas');
 
     // ── Create Recruiters ──
     const recruiters = await User.create([
@@ -420,6 +427,9 @@ const seed = async () => {
       },
     ]);
     console.log('✓ Created sample notifications');
+
+    const skillCount = await rebuildSkillCatalog();
+    console.log(`✓ Built skill catalogue (${skillCount} skills)`);
 
     console.log('\n✅ Database seeded successfully!');
     console.log('\n📋 Test Accounts:');

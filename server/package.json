@@ -6,7 +6,11 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "seed": "node seed.js"
+    "seed": "node seed.js",
+    "db:sync": "node scripts/sync-db.js",
+    "test": "node --import ./tests/setup.js --test --test-concurrency=1 tests/skills.test.js tests/applications.test.js tests/email.test.js tests/api.test.js",
+    "benchmark": "node scripts/benchmark-indexes.js",
+    "loadtest": "node scripts/load-test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -24,6 +28,7 @@
     "socket.io": "^4.7.4"
   },
   "devDependencies": {
-    "nodemon": "^3.0.2"
+    "nodemon": "^3.0.2",
+    "socket.io-client": "^4.8.4"
   }
 }

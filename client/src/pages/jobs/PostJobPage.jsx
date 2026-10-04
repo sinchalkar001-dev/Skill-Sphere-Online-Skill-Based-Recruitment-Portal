@@ -1,11 +1,12 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Switch } from '@headlessui/react';
 import { ArrowLeftIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import PageLayout from '../../components/layout/PageLayout';
 import FormSection from '../../components/common/FormSection';
 import TechTagInput from '../../components/jobs/TechTagInput';
-import { ButtonSpinner } from '../../components/common/LoadingSpinner';
+import { ButtonSpinner, PageLoader } from '../../components/common/LoadingSpinner';
+import { useAuth } from '../../context/AuthContext';
 import jobsApi from '../../api/jobsApi';
 import toast from 'react-hot-toast';
 
@@ -15,27 +16,91 @@ const Required = () => (
   </span>
 );
 
+const EMPTY_FORM = {
+  title: '',
+  description: '',
+  requirements: [''],
+  responsibilities: [''],
+  techStack: [],
+  salary: { min: '', max: '', currency: 'INR', period: 'yearly' },
+  location: '',
+  locationType: 'onsite',
+  jobType: 'full-time',
+  experienceLevel: 'mid',
+  applicationDeadline: '',
+  maxApplications: '',
+  assessment: {
+    enabled: false,
+    criteria: [],
+  },
+};
+
+// Map a saved job onto the form's shape (lists always keep one empty row to type into)
+const toFormState = (job) => ({
+  title: job.title || '',
+  description: job.description || '',
+  requirements: job.requirements?.length ? job.requirements : [''],
+  responsibilities: job.responsibilities?.length ? job.responsibilities : [''],
+  techStack: job.techStack || [],
+  salary: {
+    min: job.salary?.min ?? '',
+    max: job.salary?.max ?? '',
+    currency: job.salary?.currency || 'INR',
+    period: job.salary?.period || 'yearly',
+  },
+  location: job.location || '',
+  locationType: job.locationType || 'onsite',
+  jobType: job.jobType || 'full-time',
+  experienceLevel: job.experienceLevel || 'mid',
+  applicationDeadline: job.applicationDeadline ? job.applicationDeadline.slice(0, 10) : '',
+  maxApplications: job.maxApplications ?? '',
+  assessment: {
+    enabled: Boolean(job.assessment?.enabled),
+    criteria: (job.assessment?.criteria || []).map(({ name, maxScore, weight }) => ({ name, maxScore, weight })),
+  },
+});
+
+// Serves both /jobs/new and /jobs/:id/edit
 const PostJobPage = () => {
+  const { id } = useParams();
+  const isEdit = Boolean(id);
+  const { user } = useAuth();
+  const userId = user?._id || user?.id;
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState({
-    title: '',
-    description: '',
-    requirements: [''],
-    responsibilities: [''],
-    techStack: [],
-    salary: { min: '', max: '', currency: 'INR', period: 'yearly' },
-    location: '',
-    locationType: 'onsite',
-    jobType: 'full-time',
-    experienceLevel: 'mid',
-    applicationDeadline: '',
-    maxApplications: '',
-    assessment: {
-      enabled: false,
-      criteria: [],
-    },
-  });
+  const [loadingJob, setLoadingJob] = useState(isEdit);
+  const [form, setForm] = useState(EMPTY_FORM);
+
+  useEffect(() => {
+    if (!isEdit) return undefined;
+    let cancelled = false;
+    setLoadingJob(true);
+
+    const loadJob = async () => {
+      try {
+        const { data } = await jobsApi.getJobById(id);
+        if (cancelled) return;
+        const job = data.data.job;
+        const ownerId = job.recruiter?._id || job.recruiter;
+        if (ownerId !== userId) {
+          toast.error('You can only edit your own job postings');
+          navigate(`/jobs/${id}`, { replace: true });
+          return;
+        }
+        setForm(toFormState(job));
+        setLoadingJob(false);
+      } catch {
+        if (cancelled) return;
+        toast.error('Job not found');
+        navigate('/dashboard', { replace: true });
+      }
+    };
+    loadJob();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, isEdit, userId, navigate]);
 
   const updateField = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
 
@@ -103,11 +168,11 @@ const PostJobPage = () => {
         applicationDeadline: form.applicationDeadline || undefined,
       };
 
-      const { data } = await jobsApi.createJob(payload);
-      toast.success('Job posted');
+      const { data } = isEdit ? await jobsApi.updateJob(id, payload) : await jobsApi.createJob(payload);
+      toast.success(isEdit ? 'Changes saved' : 'Job posted');
       navigate(`/jobs/${data.data.job._id}`);
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to post job');
+      toast.error(err.response?.data?.message || (isEdit ? 'Failed to save changes' : 'Failed to post job'));
     } finally {
       setSubmitting(false);
     }
@@ -147,18 +212,24 @@ const PostJobPage = () => {
     </>
   );
 
+  if (loadingJob) return <PageLayout><PageLoader /></PageLayout>;
+
   return (
     <PageLayout>
       <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:py-10">
         <Link
-          to="/dashboard"
+          to={isEdit ? `/jobs/${id}` : '/dashboard'}
           className="inline-flex items-center gap-1.5 rounded text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
           <ArrowLeftIcon aria-hidden="true" className="h-4 w-4" />
-          Dashboard
+          {isEdit ? 'Back to posting' : 'Dashboard'}
         </Link>
-        <h1 className="page-title mt-6">Post a job</h1>
-        <p className="page-subtitle">Candidates see everything below, so be specific. Fields marked * are required.</p>
+        <h1 className="page-title mt-6">{isEdit ? 'Edit job' : 'Post a job'}</h1>
+        <p className="page-subtitle">
+          {isEdit
+            ? 'Changes appear on the posting as soon as you save. Fields marked * are required.'
+            : 'Candidates see everything below, so be specific. Fields marked * are required.'}
+        </p>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-6">
           <FormSection id="basics" title="Role basics" description="The title and description are what candidates read first.">
@@ -420,7 +491,7 @@ const PostJobPage = () => {
             </button>
             <button type="submit" disabled={submitting} className="btn-primary" id="post-job-submit">
               {submitting && <ButtonSpinner />}
-              {submitting ? 'Posting…' : 'Post job'}
+              {isEdit ? (submitting ? 'Saving…' : 'Save changes') : submitting ? 'Posting…' : 'Post job'}
             </button>
           </div>
         </form>

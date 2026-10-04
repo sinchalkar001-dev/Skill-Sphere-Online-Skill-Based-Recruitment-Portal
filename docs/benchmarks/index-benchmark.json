@@ -1,0 +1,74 @@
+{
+  "ranAt": "2026-10-02T16:14:35.939Z",
+  "node": "v25.2.1",
+  "mongodb": "8.0.13",
+  "dataset": {
+    "recruiters": 30,
+    "candidates": 20000,
+    "jobs": 300,
+    "applications": 156112
+  },
+  "iterations": 100,
+  "results": [
+    {
+      "query": "Recruiter dashboard: pipeline counts across all postings",
+      "beforeMedianMs": 28.16,
+      "afterMedianMs": 12.08,
+      "beforeP95Ms": 34.49,
+      "afterP95Ms": 17.8,
+      "medianChange": "57%",
+      "docsExaminedBefore": 5262,
+      "docsExaminedAfter": 0
+    },
+    {
+      "query": "Applicants page: status counts for one posting",
+      "beforeMedianMs": 4.15,
+      "afterMedianMs": 1.99,
+      "beforeP95Ms": 5.4,
+      "afterP95Ms": 4.09,
+      "medianChange": "52%",
+      "docsExaminedBefore": 528,
+      "docsExaminedAfter": 0
+    },
+    {
+      "query": "Applicants page: one status, newest first (page of 20 + total)",
+      "beforeMedianMs": 6.17,
+      "afterMedianMs": 3.82,
+      "beforeP95Ms": 7.9,
+      "afterP95Ms": 6.12,
+      "medianChange": "38%",
+      "docsExaminedBefore": 528,
+      "docsExaminedAfter": 20
+    },
+    {
+      "query": "Applicants page: all statuses, ranked by score (page of 20)",
+      "beforeMedianMs": 5.25,
+      "afterMedianMs": 2.73,
+      "beforeP95Ms": 7.29,
+      "afterP95Ms": 3.58,
+      "medianChange": "48%",
+      "docsExaminedBefore": 528,
+      "docsExaminedAfter": 20
+    },
+    {
+      "query": "Candidate dashboard: own applications by status",
+      "beforeMedianMs": 1.92,
+      "afterMedianMs": 2.01,
+      "beforeP95Ms": 3.08,
+      "afterP95Ms": 3.17,
+      "medianChange": "-5%",
+      "docsExaminedBefore": 7,
+      "docsExaminedAfter": 0
+    },
+    {
+      "query": "Job board: active postings for a skill tag, newest first (page of 12)",
+      "beforeMedianMs": 2.92,
+      "afterMedianMs": 2.37,
+      "beforeP95Ms": 3.88,
+      "afterP95Ms": 3.19,
+      "medianChange": "19%",
+      "docsExaminedBefore": 44,
+      "docsExaminedAfter": 12
+    }
+  ]
+}

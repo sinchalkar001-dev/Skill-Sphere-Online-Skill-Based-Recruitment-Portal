@@ -1,117 +1,255 @@
 import nodemailer from 'nodemailer';
 import env from '../config/env.js';
+import { EmailJob, Notification } from '../models/index.js';
 
-// Create transporter — falls back to console logging if no email config
-let transporter;
+const LOCK_MS = 2 * 60 * 1000; // how long a worker may hold a job before it is considered crashed
+const MAX_RETRY_DELAY_MS = 60 * 60 * 1000;
+const RETENTION_MS = 30 * 24 * 60 * 60 * 1000; // finished jobs are kept 30 days for troubleshooting
 
-if (env.EMAIL_USER && env.EMAIL_PASSWORD) {
-  transporter = nodemailer.createTransport({
-    host: env.EMAIL_HOST,
-    port: env.EMAIL_PORT,
-    secure: env.EMAIL_PORT === 465,
-    auth: {
-      user: env.EMAIL_USER,
-      pass: env.EMAIL_PASSWORD,
-    },
-  });
-} else {
-  console.log('⚠ Email not configured. Emails will be logged to console.');
-}
+// ── Transport ──
 
-// Email templates
+const consoleTransport = {
+  sendMail: async ({ to, subject }) => {
+    console.log(`Email (not sent, no SMTP configured) to ${to}: ${subject}`);
+  },
+};
+
+const createDefaultTransport = () => {
+  if (env.EMAIL_USER && env.EMAIL_PASSWORD) {
+    return nodemailer.createTransport({
+      host: env.EMAIL_HOST,
+      port: env.EMAIL_PORT,
+      secure: env.EMAIL_PORT === 465,
+      auth: {
+        user: env.EMAIL_USER,
+        pass: env.EMAIL_PASSWORD,
+      },
+    });
+  }
+  console.log('Email not configured. Emails will be logged to the console.');
+  return consoleTransport;
+};
+
+let transport = createDefaultTransport();
+
+/** Swap the transport (used by tests to simulate a failing mail server). */
+export const setEmailTransport = (next) => {
+  transport = next || createDefaultTransport();
+};
+
+// ── Templates ──
+
+// Names, job titles and feedback are user input, so escape them before putting them in HTML
+const escapeHtml = (value) =>
+  String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
+
+const BRAND = '#0369A1';
+const STATUS_LABELS = {
+  applied: 'Applied',
+  reviewing: 'In review',
+  shortlisted: 'Shortlisted',
+  assessed: 'Assessed',
+  accepted: 'Accepted',
+  rejected: 'Rejected',
+};
+const STATUS_COLORS = { accepted: '#16A34A', rejected: '#DC2626' };
+
+const layout = (heading, body) => `
+  <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #D7E2EC; border-radius: 12px; overflow: hidden;">
+    <div style="background: ${BRAND}; padding: 24px 32px; color: #ffffff;">
+      <p style="margin: 0 0 6px; font-size: 14px; font-weight: 600;">Skill Sphere</p>
+      <h1 style="margin: 0; font-size: 22px; line-height: 1.3;">${heading}</h1>
+    </div>
+    <div style="background: #ffffff; padding: 28px 32px; color: #0F2A3D; font-size: 15px; line-height: 1.6;">
+      ${body}
+    </div>
+  </div>
+`;
+
+const button = (href, label) =>
+  `<a href="${href}" style="display: inline-block; background: ${BRAND}; color: #ffffff; padding: 11px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 12px;">${label}</a>`;
+
 const templates = {
   welcome: (data) => ({
-    subject: `Welcome to Skill Sphere, ${data.name}!`,
-    html: `
-      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 16px; overflow: hidden;">
-        <div style="padding: 40px; color: white; text-align: center;">
-          <h1 style="margin: 0; font-size: 28px;">🚀 Welcome to Skill Sphere</h1>
-          <p style="opacity: 0.9; font-size: 16px;">Your journey to the perfect ${data.role === 'recruiter' ? 'hire' : 'career'} starts now</p>
-        </div>
-        <div style="background: white; padding: 32px; border-radius: 16px 16px 0 0;">
-          <h2 style="color: #1a1a2e; margin-top: 0;">Hi ${data.name},</h2>
-          <p style="color: #4a5568; line-height: 1.6;">Thank you for joining Skill Sphere! We're excited to have you on board.</p>
-          ${data.role === 'recruiter' 
-            ? '<p style="color: #4a5568;">Start posting jobs and find the best talent matched to your requirements.</p>'
-            : '<p style="color: #4a5568;">Browse opportunities, showcase your projects, and let your skills speak for themselves.</p>'
-          }
-          <a href="${env.FRONTEND_URL}/dashboard" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 16px;">Go to Dashboard</a>
-        </div>
-      </div>
-    `,
+    subject: `Welcome to Skill Sphere, ${data.name}`,
+    html: layout(
+      'Welcome to Skill Sphere',
+      `
+        <p style="margin-top: 0;">Hi ${escapeHtml(data.name)},</p>
+        <p>Your ${data.role === 'recruiter' ? 'recruiter' : 'candidate'} account is ready.</p>
+        <p style="color: #4A6378;">${
+          data.role === 'recruiter'
+            ? 'Post a role, set your rubric, and score applicants on the work they share.'
+            : 'Add your skills and projects, then apply to roles that match your stack.'
+        }</p>
+        ${button(`${env.FRONTEND_URL}/dashboard`, 'Go to your dashboard')}
+      `
+    ),
   }),
 
   applicationReceived: (data) => ({
-    subject: `New Application for "${data.jobTitle}"`,
-    html: `
-      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 24px; border-radius: 12px 12px 0 0; color: white;">
-          <h2 style="margin: 0;">📩 New Application Received</h2>
-        </div>
-        <div style="background: #f8fafc; padding: 24px; border: 1px solid #e2e8f0; border-radius: 0 0 12px 12px;">
-          <p style="color: #2d3748;"><strong>${data.candidateName}</strong> applied for <strong>${data.jobTitle}</strong></p>
-          <p style="color: #4a5568;">Review their application and assess their skills on your dashboard.</p>
-          <a href="${env.FRONTEND_URL}/dashboard" style="display: inline-block; background: #667eea; color: white; padding: 10px 24px; border-radius: 8px; text-decoration: none;">Review Application</a>
-        </div>
-      </div>
-    `,
+    subject: `New application for "${data.jobTitle}"`,
+    html: layout(
+      'New application received',
+      `
+        <p style="margin-top: 0;"><strong>${escapeHtml(data.candidateName)}</strong> applied for <strong>${escapeHtml(data.jobTitle)}</strong>.</p>
+        <p style="color: #4A6378;">Review their projects and score the application from your dashboard.</p>
+        ${button(`${env.FRONTEND_URL}/dashboard`, 'Review application')}
+      `
+    ),
   }),
 
-  statusChange: (data) => ({
-    subject: `Application Update: ${data.status.charAt(0).toUpperCase() + data.status.slice(1)}`,
-    html: `
-      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 24px; border-radius: 12px 12px 0 0; color: white;">
-          <h2 style="margin: 0;">📋 Application Status Update</h2>
-        </div>
-        <div style="background: #f8fafc; padding: 24px; border: 1px solid #e2e8f0; border-radius: 0 0 12px 12px;">
-          <p style="color: #2d3748;">Hi ${data.candidateName},</p>
-          <p style="color: #4a5568;">Your application for <strong>${data.jobTitle}</strong> has been updated to: 
-            <span style="background: ${data.status === 'accepted' ? '#48bb78' : data.status === 'rejected' ? '#f56565' : '#667eea'}; color: white; padding: 4px 12px; border-radius: 16px; font-size: 14px;">${data.status.toUpperCase()}</span>
+  statusChange: (data) => {
+    const label = STATUS_LABELS[data.status] || data.status;
+    return {
+      subject: `Application update: ${label}`,
+      html: layout(
+        'Your application was updated',
+        `
+          <p style="margin-top: 0;">Hi ${escapeHtml(data.candidateName)},</p>
+          <p>Your application for <strong>${escapeHtml(data.jobTitle)}</strong> is now:
+            <span style="display: inline-block; background: ${STATUS_COLORS[data.status] || BRAND}; color: #ffffff; padding: 3px 12px; border-radius: 16px; font-size: 13px; font-weight: 600;">${escapeHtml(label)}</span>
           </p>
-          ${data.feedback ? `<p style="color: #4a5568; background: #edf2f7; padding: 12px; border-radius: 8px; border-left: 4px solid #667eea;">${data.feedback}</p>` : ''}
-          <a href="${env.FRONTEND_URL}/applications" style="display: inline-block; background: #667eea; color: white; padding: 10px 24px; border-radius: 8px; text-decoration: none;">View Details</a>
-        </div>
-      </div>
-    `,
-  }),
+          ${
+            data.feedback
+              ? `<p style="background: #EAF0F5; padding: 12px 16px; border-radius: 8px; border-left: 4px solid ${BRAND}; color: #4A6378;">${escapeHtml(data.feedback)}</p>`
+              : ''
+          }
+          ${button(`${env.FRONTEND_URL}/applications`, 'View application')}
+        `
+      ),
+    };
+  },
 };
 
+// ── Delivery with retries ──
+
 /**
- * Send an email using a template
- * @param {string} to - Recipient email
- * @param {string} templateName - Template key from templates object
- * @param {object} data - Data to pass to the template
+ * Wait before the next attempt, after `attempt` failures: 30s, 2m, 8m, 32m (capped at 1h).
  */
-export const sendEmail = async (to, templateName, data) => {
+export const getRetryDelayMs = (attempt, baseMs = env.EMAIL_RETRY_BASE_MS) =>
+  Math.min(baseMs * 4 ** Math.max(attempt - 1, 0), MAX_RETRY_DELAY_MS);
+
+const dueFilter = (now) => ({
+  $or: [
+    { status: 'pending', nextAttemptAt: { $lte: now } },
+    // claimed by a worker that never finished (crash or restart mid-send)
+    { status: 'sending', lockedUntil: { $lte: now } },
+  ],
+});
+
+/**
+ * Try to deliver one queued email. Returns the job after the attempt, or null
+ * if it was not due or another worker already claimed it.
+ */
+export const deliverEmailJob = async (jobId) => {
+  const now = new Date();
+
+  // Atomic claim: of any number of concurrent workers, exactly one moves the job to "sending"
+  const job = await EmailJob.findOneAndUpdate(
+    { _id: jobId, ...dueFilter(now) },
+    { $set: { status: 'sending', lockedUntil: new Date(now.getTime() + LOCK_MS) }, $inc: { attempts: 1 } },
+    { new: true }
+  );
+  if (!job) return null;
+
   try {
-    const template = templates[templateName];
-    if (!template) {
-      console.warn(`Email template '${templateName}' not found`);
-      return false;
-    }
-
-    const { subject, html } = template(data);
-
-    if (!transporter) {
-      // Log to console in development
-      console.log(`📧 Email (${templateName}) to ${to}: ${subject}`);
-      return true;
-    }
-
-    await transporter.sendMail({
+    const { subject, html } = templates[job.template](job.data || {});
+    await transport.sendMail({
       from: `"${env.SENDER_NAME}" <${env.SENDER_EMAIL}>`,
-      to,
+      to: job.to,
       subject,
       html,
     });
 
-    console.log(`✓ Email sent to ${to}: ${subject}`);
-    return true;
+    job.set({
+      status: 'sent',
+      sentAt: new Date(),
+      lastError: undefined,
+      lockedUntil: undefined,
+      expiresAt: new Date(Date.now() + RETENTION_MS),
+    });
+    await job.save();
+
+    if (job.notification) {
+      await Notification.updateOne({ _id: job.notification }, { isEmailSent: true });
+    }
   } catch (error) {
-    console.error(`✗ Email failed to ${to}:`, error.message);
-    return false;
+    const exhausted = job.attempts >= job.maxAttempts;
+    job.set({
+      status: exhausted ? 'failed' : 'pending',
+      lastError: error.message,
+      lockedUntil: undefined,
+      ...(exhausted
+        ? { expiresAt: new Date(Date.now() + RETENTION_MS) }
+        : { nextAttemptAt: new Date(Date.now() + getRetryDelayMs(job.attempts)) }),
+    });
+    await job.save();
+    console.error(
+      `Email to ${job.to} failed (attempt ${job.attempts}/${job.maxAttempts}${exhausted ? ', giving up' : ', will retry'}): ${error.message}`
+    );
   }
+
+  return job;
 };
 
-export default { sendEmail };
+/**
+ * Queue an email and start delivering it in the background, so the API response
+ * never waits on the mail server. Failures are retried by the worker below.
+ * @param {object} options
+ * @param {string} options.to - Recipient email
+ * @param {string} options.template - Template key from the templates object
+ * @param {object} options.data - Data to pass to the template
+ * @param {string} [options.notificationId] - Notification to mark as emailed on success
+ */
+export const queueEmail = async ({ to, template, data, notificationId }) => {
+  if (!templates[template]) {
+    console.warn(`Email template '${template}' not found`);
+    return null;
+  }
+
+  const job = await EmailJob.create({
+    to,
+    template,
+    data,
+    notification: notificationId,
+    maxAttempts: env.EMAIL_MAX_ATTEMPTS,
+  });
+
+  setImmediate(() => {
+    deliverEmailJob(job._id).catch((error) => console.error('Email delivery error:', error.message));
+  });
+
+  return job;
+};
+
+/**
+ * Deliver every email that is due: new ones whose first attempt has not run yet,
+ * and failed ones whose retry time has arrived.
+ */
+export const processDueEmails = async (limit = 25) => {
+  const due = await EmailJob.find(dueFilter(new Date())).sort({ nextAttemptAt: 1 }).limit(limit).select('_id').lean();
+
+  let attempted = 0;
+  for (const { _id } of due) {
+    if (await deliverEmailJob(_id)) attempted += 1;
+  }
+  return attempted;
+};
+
+let workerTimer = null;
+
+export const startEmailWorker = () => {
+  if (workerTimer) return;
+  workerTimer = setInterval(() => {
+    processDueEmails().catch((error) => console.error('Email worker error:', error.message));
+  }, env.EMAIL_WORKER_INTERVAL_MS);
+  workerTimer.unref();
+};
+
+export const stopEmailWorker = () => {
+  clearInterval(workerTimer);
+  workerTimer = null;
+};
+
+export default { queueEmail, deliverEmailJob, processDueEmails, startEmailWorker, stopEmailWorker };
