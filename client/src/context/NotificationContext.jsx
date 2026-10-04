@@ -17,14 +17,24 @@ export const NotificationProvider = ({ children }) => {
   useEffect(() => {
     if (!isAuthenticated || !user) return;
 
+    // The server identifies the user from the token and joins their room itself.
+    // The function form re-reads the token on every reconnect, so a refreshed token is used.
     const newSocket = io(window.location.origin, {
       transports: ['websocket', 'polling'],
+      auth: (send) => send({ token: localStorage.getItem('accessToken') }),
     });
 
+    // A rejected token (e.g. expired) stops automatic reconnection. Retry a few times,
+    // since the API client may refresh the token in the meantime.
+    let retries = 0;
+    let retryTimer;
     newSocket.on('connect', () => {
-      newSocket.emit('join', user._id || user.id);
-      if (user.role === 'recruiter') {
-        newSocket.emit('join:recruiter', user._id || user.id);
+      retries = 0;
+    });
+    newSocket.on('connect_error', () => {
+      if (!newSocket.active && retries < 5) {
+        retries += 1;
+        retryTimer = setTimeout(() => newSocket.connect(), 5000 * retries);
       }
     });
 
@@ -39,6 +49,7 @@ export const NotificationProvider = ({ children }) => {
     setSocket(newSocket);
 
     return () => {
+      clearTimeout(retryTimer);
       newSocket.disconnect();
     };
   }, [isAuthenticated, user]);

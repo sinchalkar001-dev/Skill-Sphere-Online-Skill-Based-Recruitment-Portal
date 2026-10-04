@@ -52,6 +52,7 @@ Six MongoDB collections:
 ### How the important parts work
 
 - **Authentication.** Passwords are hashed with bcrypt (cost 12). Login returns a signed JWT access token and refresh token; the server keeps no session state. A role guard restricts each route to candidates or recruiters, and ownership is checked for every job and application.
+- **Real-time notifications.** Socket.IO connections must present the same JWT as API requests. The server places each socket only in its own user's room, using the id from the verified token, so no client can subscribe to someone else's notifications.
 - **Dashboards.** Status counts come from one aggregation per dashboard. The compound indexes above let MongoDB answer those counts from the index without reading any application documents, and let the applicants page read only the 20 rows it shows from a posting with hundreds of applications.
 - **Applying under load.** Taking a slot on a posting is a single atomic update that checks the posting is open, before its deadline and under its cap. Concurrent applicants can never push a posting over its limit, and a unique index guarantees one application per candidate.
 - **Email with retry.** Every email is first written to the `emailjobs` outbox, then delivered in the background. A failed send is retried up to five times with increasing waits (30 s, 2 min, 8 min, 32 min). A worker claims each job atomically, so an email is sent once even with several server instances, and nothing is lost if the server restarts mid-send.

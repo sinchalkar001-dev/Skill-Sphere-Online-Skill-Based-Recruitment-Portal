@@ -1,5 +1,6 @@
 import { Server } from 'socket.io';
 import env from './env.js';
+import { authenticateToken } from '../middleware/auth.js';
 
 let io;
 
@@ -14,26 +15,25 @@ export const initializeSocket = (httpServer) => {
     pingInterval: 25000,
   });
 
+  // Connections must present the same JWT as API requests (sent as `auth.token`)
+  io.use(async (socket, next) => {
+    try {
+      const user = await authenticateToken(socket.handshake.auth?.token);
+      socket.data.userId = String(user._id);
+      next();
+    } catch (error) {
+      next(new Error(error.statusCode === 401 ? 'Unauthorized' : 'Authentication failed'));
+    }
+  });
+
   io.on('connection', (socket) => {
-    console.log(`Socket connected: ${socket.id}`);
-
-    // User joins their personal notification room
-    socket.on('join', (userId) => {
-      if (userId) {
-        socket.join(`user:${userId}`);
-        console.log(`User ${userId} joined notification room`);
-      }
-    });
-
-    // Recruiter joins company room for job-related notifications
-    socket.on('join:recruiter', (recruiterId) => {
-      if (recruiterId) {
-        socket.join(`recruiter:${recruiterId}`);
-      }
-    });
+    // A socket only ever joins its own user's room. The id comes from the verified
+    // token, not from the client, so nobody can listen to another user's notifications.
+    socket.join(`user:${socket.data.userId}`);
+    if (env.isDev) console.log(`Socket connected: ${socket.id} (user ${socket.data.userId})`);
 
     socket.on('disconnect', () => {
-      console.log(`Socket disconnected: ${socket.id}`);
+      if (env.isDev) console.log(`Socket disconnected: ${socket.id}`);
     });
   });
 

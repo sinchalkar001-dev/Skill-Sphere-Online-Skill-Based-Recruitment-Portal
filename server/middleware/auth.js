@@ -25,45 +25,44 @@ const findUser = async (id) => {
 export const invalidateUserCache = (id) => userCache.delete(String(id));
 
 /**
- * Protect routes — verify JWT and attach user to request
+ * Verify an access token and return the active user it belongs to; throws a 401
+ * ApiError otherwise. Shared by HTTP routes and Socket.IO connections.
  */
-export const protect = asyncHandler(async (req, res, next) => {
-  let token;
-
-  // Extract token from Authorization header
-  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-    token = req.headers.authorization.split(' ')[1];
-  }
-
+export const authenticateToken = async (token) => {
   if (!token) {
     throw ApiError.unauthorized('Not authorized. Please log in.');
   }
 
+  let decoded;
   try {
-    // Verify token
-    const decoded = jwt.verify(token, env.JWT_SECRET);
-
-    // Attach user to request
-    const user = await findUser(decoded.id);
-    if (!user) {
-      throw ApiError.unauthorized('User belonging to this token no longer exists.');
-    }
-
-    if (!user.isActive) {
-      throw ApiError.unauthorized('Your account has been deactivated.');
-    }
-
-    req.user = user;
-    next();
+    decoded = jwt.verify(token, env.JWT_SECRET);
   } catch (error) {
-    if (error.name === 'JsonWebTokenError') {
-      throw ApiError.unauthorized('Invalid token.');
-    }
     if (error.name === 'TokenExpiredError') {
       throw ApiError.unauthorized('Token has expired. Please log in again.');
     }
-    throw error;
+    throw ApiError.unauthorized('Invalid token.');
   }
+
+  const user = await findUser(decoded.id);
+  if (!user) {
+    throw ApiError.unauthorized('User belonging to this token no longer exists.');
+  }
+  if (!user.isActive) {
+    throw ApiError.unauthorized('Your account has been deactivated.');
+  }
+  return user;
+};
+
+/**
+ * Protect routes — verify JWT and attach user to request
+ */
+export const protect = asyncHandler(async (req, res, next) => {
+  // Extract token from Authorization header
+  const header = req.headers.authorization;
+  const token = header && header.startsWith('Bearer') ? header.split(' ')[1] : undefined;
+
+  req.user = await authenticateToken(token);
+  next();
 });
 
 /**

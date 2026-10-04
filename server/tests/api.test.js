@@ -1,12 +1,13 @@
 // End-to-end checks against a real server process: authentication, password
-// storage and role-based access.
+// storage, role-based access, job editing and real-time notifications.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import jwt from 'jsonwebtoken';
-import { User, EmailJob } from '../models/index.js';
+import { io as connectSocket } from 'socket.io-client';
+import { User, EmailJob, Skill } from '../models/index.js';
 import { connect, resetDatabase, disconnect } from './helpers.js';
 
 const PORT = 5098;
@@ -173,4 +174,99 @@ test('the job board filters by skill tag in any letter case and suggests skills'
 
   const suggestions = await api('/api/skills?q=no');
   assert.deepEqual(suggestions.body.data.skills.map((skill) => skill.name), ['Node.js']);
+});
+
+test('a recruiter can edit their own posting, and only theirs', async () => {
+  const update = { title: 'Senior Backend Engineer', techStack: ['Node.js', 'PostgreSQL'] };
+
+  assert.equal((await api(`/api/jobs/${jobId}`, { method: 'PUT', token: accounts.otherRecruiter.token, body: update })).status, 403);
+  assert.equal((await api(`/api/jobs/${jobId}`, { method: 'PUT', token: accounts.candidate.token, body: update })).status, 403);
+
+  const edited = await api(`/api/jobs/${jobId}`, { method: 'PUT', token: accounts.recruiter.token, body: update });
+  assert.equal(edited.status, 200);
+  assert.equal(edited.body.data.job.title, 'Senior Backend Engineer');
+  assert.equal((await api(`/api/jobs/${jobId}`)).body.data.job.title, 'Senior Backend Engineer');
+
+  // Skill filtering and the catalogue follow the new tech stack
+  assert.equal((await api('/api/jobs?techStack=postgresql')).body.data.jobs.length, 1);
+  assert.equal((await api('/api/jobs?techStack=mongodb')).body.data.jobs.length, 0);
+  assert.equal((await Skill.findOne({ key: 'mongodb' })).jobCount, 0);
+  assert.equal((await Skill.findOne({ key: 'postgresql' })).jobCount, 1);
+});
+
+// ── Real-time notifications ──
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const openSocket = (token) =>
+  new Promise((resolve, reject) => {
+    const socket = connectSocket(BASE, {
+      transports: ['websocket'],
+      auth: token ? { token } : {},
+      reconnection: false,
+      forceNew: true,
+    });
+    socket.once('connect', () => resolve(socket));
+    socket.once('connect_error', (error) => {
+      socket.close();
+      reject(error);
+    });
+  });
+
+// Resolves with the next notification, or null if none arrives in time
+const nextNotification = (socket, timeoutMs) =>
+  new Promise((resolve) => {
+    const onNotification = (notification) => {
+      clearTimeout(timer);
+      resolve(notification);
+    };
+    const timer = setTimeout(() => {
+      socket.off('notification', onNotification);
+      resolve(null);
+    }, timeoutMs);
+    socket.once('notification', onNotification);
+  });
+
+test('socket connections are refused without a valid token', async () => {
+  await assert.rejects(openSocket(), /Unauthorized/);
+  await assert.rejects(openSocket('not-a-jwt'), /Unauthorized/);
+  await assert.rejects(openSocket(jwt.sign({ id: accounts.candidate._id }, 'some-other-secret')), /Unauthorized/);
+
+  const socket = await openSocket(accounts.candidate.token);
+  assert.ok(socket.connected);
+  socket.close();
+});
+
+test("a socket receives only its own user's notifications, whatever room it asks to join", async () => {
+  const candidateSocket = await openSocket(accounts.candidate.token);
+  const recruiterSocket = await openSocket(accounts.recruiter.token);
+
+  // The previous protocol let any client join any user's room by sending their id
+  candidateSocket.emit('join', accounts.recruiter._id);
+  candidateSocket.emit('join:recruiter', accounts.recruiter._id);
+  await sleep(200);
+
+  const posted = await api('/api/jobs', {
+    method: 'POST',
+    token: accounts.recruiter.token,
+    body: { title: 'Frontend Engineer', description: 'Build the UI.', techStack: ['React'] },
+  });
+  const recruiterReceives = nextNotification(recruiterSocket, 3000);
+  const candidateReceives = nextNotification(candidateSocket, 1500);
+
+  // Applying notifies the recruiter, not the candidate
+  const applied = await api('/api/applications', {
+    method: 'POST',
+    token: accounts.candidate.token,
+    body: { jobId: posted.body.data.job._id },
+  });
+  assert.equal(applied.status, 201);
+
+  const delivered = await recruiterReceives;
+  assert.equal(delivered?.type, 'application_received');
+  assert.ok(delivered._id);
+  assert.equal(await candidateReceives, null);
+
+  candidateSocket.close();
+  recruiterSocket.close();
 });
